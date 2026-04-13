@@ -27,20 +27,22 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
   template: `
     <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1.4fr)_18rem]">
       <section class="space-y-3.5">
-        <article class="surface-card min-h-[10.9rem] p-3.5">
+        <article class="surface-card p-3.5">
           <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <div class="space-y-2.5">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your code</p>
-                  @if (store.session(); as session) {
-                    <h2 class="mt-1 text-[1.85rem] font-bold tracking-tight" style="color: var(--text-strong);">{{ session.code }}</h2>
-                  } @else {
-                    <h2 class="mt-1 text-[1.8rem] font-bold tracking-tight" style="color: var(--text-strong);">Not connected</h2>
-                  }
+                  <div class="mt-1 flex h-[2.3rem] items-center">
+                    @if (store.session(); as session) {
+                      <h2 class="text-[1.8rem] leading-none font-bold tracking-tight" style="color: var(--text-strong);">{{ session.code }}</h2>
+                    } @else {
+                      <h2 class="text-[1.8rem] leading-none font-bold tracking-tight" style="color: var(--text-strong);">Not connected</h2>
+                    }
+                  </div>
                 </div>
 
-                <div class="flex min-h-[3.25rem] min-w-[8.5rem] flex-col items-end justify-start text-right">
+                <div class="flex h-[3.25rem] min-w-[8.5rem] flex-col items-end justify-start text-right">
                   <app-status-badge [label]="store.sessionStatus()" [tone]="sessionTone()" />
                   <div class="mt-1 text-xs font-semibold" style="color: var(--muted-label);">
                     @if (store.session(); as session) {
@@ -52,7 +54,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
                 </div>
               </div>
 
-              <div class="flex flex-wrap gap-1.5">
+              <div class="flex h-[2.15rem] items-center gap-1.5 overflow-hidden">
                 <button class="icon-button icon-button-active" type="button" (click)="store.createSession()" [disabled]="store.busyAction() !== null" aria-label="New code" title="New code">
                   <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                     <path d="M12 5v14" />
@@ -104,15 +106,17 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
 
         <article class="surface-card p-2.5">
           <div class="mb-2.5 flex items-center gap-2 overflow-x-auto pb-1">
-            <select
-              class="field-input h-[2.15rem] w-auto min-w-[7.25rem] max-w-[8.5rem] shrink-0 px-3 py-0 pr-8 text-sm leading-[2.15rem]"
-              [value]="store.draft().language"
-              (change)="store.setDraftLanguage($any($event.target).value)"
-            >
-              @for (language of languages; track language.id) {
-                <option [value]="language.id">{{ language.label }}</option>
-              }
-            </select>
+            <div class="workspace-compact-select-shell">
+              <select
+                class="workspace-compact-select"
+                [value]="store.draft().language"
+                (change)="store.setDraftLanguage($any($event.target).value)"
+              >
+                @for (language of languages; track language.id) {
+                  <option [value]="language.id">{{ language.label }}</option>
+                }
+              </select>
+            </div>
           </div>
 
           <div>

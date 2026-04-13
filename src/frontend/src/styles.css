@@ -216,6 +216,50 @@ a {
   font-size: 0.85rem;
 }
 
+.workspace-compact-select-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 7.25rem;
+  max-width: 8.5rem;
+  height: 2.15rem;
+  flex-shrink: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-ui);
+  background: white;
+}
+
+.workspace-compact-select {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-strong);
+  padding: 0 2rem 0 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  outline: none;
+  appearance: none;
+}
+
+.workspace-compact-select-shell::after {
+  content: "";
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid var(--muted-label);
+  border-bottom: 1.5px solid var(--muted-label);
+  transform: translateY(-60%) rotate(45deg);
+  pointer-events: none;
+}
+
+.workspace-compact-select-shell:focus-within {
+  border-color: var(--surface-strong);
+  box-shadow: 0 0 0 3px rgb(200 220 234 / 0.55);
+}
+
 .section-title {
   margin: 0;
   font-size: clamp(1.2rem, 2vw, 1.65rem);
