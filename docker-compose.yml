@@ -63,6 +63,8 @@ services:
       - /src/src/backend/BlinkShare.Api/BlinkShare.Api.csproj
       - --startup-project
       - /src/src/backend/BlinkShare.Api/BlinkShare.Api.csproj
+      - --configuration
+      - Release
       - --no-build
     restart: "no"
 
