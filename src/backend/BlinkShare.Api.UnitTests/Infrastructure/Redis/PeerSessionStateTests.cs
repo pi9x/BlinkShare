@@ -48,4 +48,27 @@ public sealed class PeerSessionStateTests
         Assert.Equal(createdAt.AddSeconds(10), peer!.LastSeenAtUtc);
         Assert.Equal(createdAt.AddSeconds(70), peer.ReconnectGraceEndsAtUtc);
     }
+
+    [Fact]
+    public void Mark_peer_disconnected_refreshes_reconnect_grace_without_changing_last_seen()
+    {
+        var createdAt = new DateTimeOffset(2026, 4, 12, 10, 0, 0, TimeSpan.Zero);
+        var peerId = Guid.NewGuid();
+        var session = new PeerSessionState(
+            Guid.NewGuid(),
+            "TEST1234",
+            PeerSessionStatus.Active,
+            createdAt,
+            createdAt.AddMinutes(5),
+            createdAt,
+            60,
+            [new PeerState(peerId, "hash", createdAt, createdAt.AddSeconds(15), createdAt.AddSeconds(60))]);
+
+        var updated = session.MarkPeerDisconnected(peerId, createdAt.AddMinutes(2));
+        var peer = updated.FindPeer(peerId);
+
+        Assert.NotNull(peer);
+        Assert.Equal(createdAt.AddSeconds(15), peer!.LastSeenAtUtc);
+        Assert.Equal(createdAt.AddMinutes(3), peer.ReconnectGraceEndsAtUtc);
+    }
 }

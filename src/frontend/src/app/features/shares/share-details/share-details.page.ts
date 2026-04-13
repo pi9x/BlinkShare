@@ -75,7 +75,7 @@ const unlockStorageKey = (code: string) => `blinkshare.unlock.${code}`;
             <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
               <p class="text-sm font-semibold text-slate-950">Text</p>
               <button class="app-button app-button-secondary" type="button" (click)="copy(textState.text)">
-                Copy
+                {{ copied() ? 'Copied' : 'Copy' }}
               </button>
             </div>
             <app-code-editor [value]="textState.text" [readOnly]="true" [wrap]="true" />
@@ -127,7 +127,10 @@ export class ShareDetailsPageComponent {
   protected readonly error = signal<AppError | null>(null);
   protected readonly loading = signal(false);
   protected readonly passcode = signal('');
+  protected readonly copied = signal(false);
   protected readonly unlockProof = signal<string | null>(sessionStorage.getItem(unlockStorageKey(this.code)));
+
+  private copiedHandle: ReturnType<typeof setTimeout> | null = null;
 
   public constructor() {
     void this.loadShare();
@@ -241,7 +244,20 @@ export class ShareDetailsPageComponent {
   }
 
   protected async copy(value: string): Promise<void> {
-    await copyText(value);
+    const copied = await copyText(value);
+    if (!copied) {
+      return;
+    }
+
+    this.copied.set(true);
+
+    if (this.copiedHandle) {
+      clearTimeout(this.copiedHandle);
+    }
+
+    this.copiedHandle = setTimeout(() => {
+      this.copied.set(false);
+    }, 1200);
   }
 
   private async loadShare(): Promise<void> {

@@ -33,7 +33,7 @@ export class AuthService {
     }
   }
 
-  public async register(email: string, password: string): Promise<void> {
+  public async register(email: string, password: string | null): Promise<void> {
     const response = await firstValueFrom(
       this.api.register({
         email,
@@ -45,7 +45,7 @@ export class AuthService {
     await this.bootstrap();
   }
 
-  public async login(email: string, password: string): Promise<void> {
+  public async login(email: string, password: string | null): Promise<void> {
     const response = await firstValueFrom(
       this.api.login({
         email,

@@ -5,7 +5,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
   standalone: true,
   template: `
     <span
-      class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+      class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.06em]"
       [class]="classes()"
     >
       <span class="h-2 w-2 rounded-full bg-current"></span>
@@ -21,13 +21,13 @@ export class StatusBadgeComponent {
   protected readonly classes = computed(() => {
     switch (this.tone()) {
       case 'success':
-        return 'border-teal-200 bg-teal-50 text-teal-800';
+        return 'border-[#D4E3EB] bg-[#EEF8FB] text-[#1A7A8A]';
       case 'warning':
-        return 'border-amber-200 bg-amber-50 text-amber-800';
+        return 'border-[#D4E3EB] bg-[#FFF6E7] text-[#C8A030]';
       case 'danger':
-        return 'border-rose-200 bg-rose-50 text-rose-800';
+        return 'border-[#F3D4CF] bg-[#FEF1EF] text-[#C0402A]';
       default:
-        return 'border-slate-200 bg-white text-slate-700';
+        return 'border-[#D4E3EB] bg-[#EEF8FB] text-[#7A9BAA]';
     }
   });
 }

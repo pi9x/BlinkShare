@@ -9,12 +9,15 @@ public sealed class AnonymousSessionHub(
     PublishFileMetadata.Validator publishFileMetadataValidator)
     : Hub
 {
+    private const string SessionIdItemKey = "AnonymousSession.SessionId";
+    private const string PeerIdItemKey = "AnonymousSession.PeerId";
+
     public async Task ConnectSession(
         Guid sessionId,
         Guid peerId,
-        string? resumeToken,
-        CancellationToken cancellationToken)
+        string? resumeToken)
     {
+        var cancellationToken = Context.ConnectionAborted;
         var accessResult = await accessService.ValidateAsync(sessionId, peerId, resumeToken, cancellationToken);
         if (accessResult.IsFailure)
         {
@@ -22,6 +25,8 @@ public sealed class AnonymousSessionHub(
         }
 
         var updatedSession = await accessService.TouchAsync(accessResult.Value!.Session, peerId, cancellationToken);
+        Context.Items[SessionIdItemKey] = sessionId;
+        Context.Items[PeerIdItemKey] = peerId;
         await Groups.AddToGroupAsync(Context.ConnectionId, GetGroupName(sessionId), cancellationToken);
 
         await Clients.Group(GetGroupName(sessionId)).SendAsync(
@@ -34,9 +39,9 @@ public sealed class AnonymousSessionHub(
         Guid sessionId,
         Guid peerId,
         string? resumeToken,
-        string? text,
-        CancellationToken cancellationToken)
+        string? text)
     {
+        var cancellationToken = Context.ConnectionAborted;
         var validationResult = publishTextValidator.Validate(new PublishText.Command(sessionId, peerId, resumeToken, text));
         if (validationResult.IsFailure)
         {
@@ -63,9 +68,9 @@ public sealed class AnonymousSessionHub(
         string? resumeToken,
         string? fileName,
         string? contentType,
-        long sizeBytes,
-        CancellationToken cancellationToken)
+        long sizeBytes)
     {
+        var cancellationToken = Context.ConnectionAborted;
         var validationResult = publishFileMetadataValidator.Validate(
             new PublishFileMetadata.Command(sessionId, peerId, resumeToken, fileName, contentType, sizeBytes));
         if (validationResult.IsFailure)
@@ -93,8 +98,38 @@ public sealed class AnonymousSessionHub(
         return message;
     }
 
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        if (TryGetConnectionSession(out var sessionId, out var peerId))
+        {
+            await accessService.MarkDisconnectedAsync(sessionId, peerId, CancellationToken.None);
+        }
+
+        await base.OnDisconnectedAsync(exception);
+    }
+
     private static string GetGroupName(Guid sessionId) => $"anonymous-session:{sessionId:D}";
 
     private static HubException CreateHubException(Error error) =>
         new($"{error.Code}|{error.Message}");
+
+    private bool TryGetConnectionSession(out Guid sessionId, out Guid peerId)
+    {
+        sessionId = Guid.Empty;
+        peerId = Guid.Empty;
+
+        if (!Context.Items.TryGetValue(SessionIdItemKey, out var sessionValue) || sessionValue is not Guid storedSessionId)
+        {
+            return false;
+        }
+
+        if (!Context.Items.TryGetValue(PeerIdItemKey, out var peerValue) || peerValue is not Guid storedPeerId)
+        {
+            return false;
+        }
+
+        sessionId = storedSessionId;
+        peerId = storedPeerId;
+        return true;
+    }
 }

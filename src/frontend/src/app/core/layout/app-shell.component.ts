@@ -2,7 +2,6 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
-import { APP_RUNTIME_CONFIG } from '../config/app-runtime-config';
 import { AuthService } from '../auth/auth.service';
 import { AuthStore } from '../auth/auth.store';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge/status-badge.component';
@@ -13,15 +12,18 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge/status-badge.
   imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, StatusBadgeComponent],
   template: `
     <div class="min-h-screen">
-      <header class="border-b border-slate-200 bg-white">
+      <header class="border-b bg-white" style="border-color: var(--line-default);">
         <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <a routerLink="/" class="flex items-center gap-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-base font-semibold text-white">
-                B
-            </div>
-            <div>
-              <h1 class="text-lg font-semibold tracking-tight text-slate-950">{{ appName }}</h1>
-              <p class="text-xs text-slate-500">Copy. Connect. Send.</p>
+            <img
+              src="brand/blinkshare-mark.svg"
+              alt="BlinkShare"
+              class="h-12 w-12 shrink-0 sm:h-[3.2rem] sm:w-[3.2rem]"
+            />
+            <div class="flex min-h-12 flex-col justify-center sm:min-h-[3.2rem]">
+              <span class="text-[2rem] leading-none font-bold tracking-[-0.06em] sm:text-[2.2rem]" style="color: var(--text-strong);">
+                Blink<span style="color: var(--surface-strong); font-weight: 400;">Share</span>
+              </span>
             </div>
           </a>
 
@@ -48,8 +50,8 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge/status-badge.
                 </svg>
               </button>
             } @else {
-              <a routerLink="/auth/login" class="app-button app-button-secondary px-3 py-2 text-sm">Login</a>
-              <a routerLink="/auth/register" class="app-button app-button-primary px-3 py-2 text-sm">Register</a>
+              <a routerLink="/auth/login" class="app-button app-button-secondary h-[2.15rem] px-3.5 py-0 text-[0.95rem]">Login</a>
+              <a routerLink="/auth/register" class="app-button app-button-primary h-[2.15rem] px-3.5 py-0 text-[0.95rem]">Register</a>
             }
           </div>
         </div>
@@ -65,10 +67,9 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge/status-badge.
 export class AppShellComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly authService = inject(AuthService);
-  protected readonly appName = APP_RUNTIME_CONFIG.appName;
 
   protected readonly authLabel = computed(() =>
-    this.authStore.authenticated() ? 'Account ready' : this.authStore.status() === 'checking' ? 'Checking session' : 'Anonymous mode',
+    this.authStore.authenticated() ? 'ACCOUNT' : this.authStore.status() === 'checking' ? 'CHECKING SESSION' : 'ANONYMOUS MODE',
   );
 
   protected readonly authTone = computed<'neutral' | 'success'>(() =>

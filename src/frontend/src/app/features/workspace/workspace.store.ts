@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { AnonymousSessionsApi } from '../../core/api/anonymous-sessions.api';
 import { HealthApi } from '../../core/api/health.api';
+import { QuotasApi } from '../../core/api/quotas.api';
 import { SharesApi } from '../../core/api/shares.api';
 import { AnonymousSessionRealtimeService } from '../../core/realtime/anonymous-session-realtime.service';
 import {
@@ -23,6 +24,7 @@ import {
   EditorLanguage,
   HealthResponse,
   LocalClipboardItem,
+  QuotaUsageResponse,
   ShareTier,
   StoredAnonymousSession,
 } from '../../shared/models/app.models';
@@ -47,7 +49,9 @@ interface WorkspaceState {
       }
     | null;
   health: HealthResponse | null;
+  quota: QuotaUsageResponse | null;
   diagnosticsError: AppError | null;
+  quotaError: AppError | null;
 }
 
 @Injectable()
@@ -56,6 +60,7 @@ export class WorkspaceStore {
   private readonly sharesApi = inject(SharesApi);
   private readonly anonymousSessionsApi = inject(AnonymousSessionsApi);
   private readonly healthApi = inject(HealthApi);
+  private readonly quotasApi = inject(QuotasApi);
   private readonly draftStorage = inject(DraftStorage);
   private readonly historyStorage = inject(LocalHistoryStorage);
   private readonly sessionRestoreStorage = inject(SessionRestoreStorage);
@@ -74,7 +79,9 @@ export class WorkspaceStore {
     busyAction: null,
     latestShare: null,
     health: null,
+    quota: null,
     diagnosticsError: null,
+    quotaError: null,
   });
 
   public readonly draft = computed(() => this.state().draft);
@@ -85,7 +92,9 @@ export class WorkspaceStore {
   public readonly busyAction = computed(() => this.state().busyAction);
   public readonly latestShare = computed(() => this.state().latestShare);
   public readonly health = computed(() => this.state().health);
+  public readonly quota = computed(() => this.state().quota);
   public readonly diagnosticsError = computed(() => this.state().diagnosticsError);
+  public readonly quotaError = computed(() => this.state().quotaError);
   public readonly realtimeStatus = computed(() => this.realtimeStore.status());
 
   public constructor() {
@@ -123,6 +132,7 @@ export class WorkspaceStore {
     }));
 
     void this.loadHealth();
+    void this.loadQuota();
 
     const restored = this.sessionRestoreStorage.load();
     if (restored) {
@@ -233,6 +243,7 @@ export class WorkspaceStore {
           note: 'Stored text share created.',
         },
       }));
+      void this.loadQuota();
     } catch (error) {
       this.failSession(error, 'share');
     }
@@ -379,6 +390,7 @@ export class WorkspaceStore {
           note: 'Stored file share uploaded and finalized.',
         },
       }));
+      void this.loadQuota();
     } catch (error) {
       this.failSession(error, 'file-share');
     }
@@ -587,6 +599,22 @@ export class WorkspaceStore {
       this.state.update((state) => ({
         ...state,
         diagnosticsError: toAppError(error),
+      }));
+    }
+  }
+
+  private async loadQuota(): Promise<void> {
+    try {
+      const response = await firstValueFrom(this.quotasApi.getUsage());
+      this.state.update((state) => ({
+        ...state,
+        quota: response,
+        quotaError: null,
+      }));
+    } catch (error) {
+      this.state.update((state) => ({
+        ...state,
+        quotaError: toAppError(error),
       }));
     }
   }

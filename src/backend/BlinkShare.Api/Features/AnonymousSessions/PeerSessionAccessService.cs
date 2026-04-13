@@ -59,6 +59,26 @@ public sealed class PeerSessionAccessService(
         await peerSessionStore.SaveAsync(updatedSession, cancellationToken);
         return updatedSession;
     }
+
+    public async Task MarkDisconnectedAsync(
+        Guid sessionId,
+        Guid peerId,
+        CancellationToken cancellationToken)
+    {
+        var session = await peerSessionStore.GetBySessionIdAsync(sessionId, cancellationToken);
+        if (session is null)
+        {
+            return;
+        }
+
+        if (session.FindPeer(peerId) is null)
+        {
+            return;
+        }
+
+        var updatedSession = session.MarkPeerDisconnected(peerId, clock.UtcNow);
+        await peerSessionStore.SaveAsync(updatedSession, cancellationToken);
+    }
 }
 
 public sealed record AuthorizedPeerSession(

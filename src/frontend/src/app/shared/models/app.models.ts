@@ -16,7 +16,21 @@ export enum ShareStatus {
   Deleted = 4,
 }
 
-export type EditorLanguage = 'plaintext' | 'json' | 'javascript' | 'html' | 'css';
+export type EditorLanguage =
+  | 'plaintext'
+  | 'json'
+  | 'javascript'
+  | 'typescript'
+  | 'jsx'
+  | 'tsx'
+  | 'html'
+  | 'xml'
+  | 'css'
+  | 'markdown'
+  | 'python'
+  | 'sql'
+  | 'yaml'
+  | 'php';
 
 export interface EditorLanguageOption {
   id: EditorLanguage;
@@ -27,8 +41,17 @@ export const EDITOR_LANGUAGES: EditorLanguageOption[] = [
   { id: 'plaintext', label: 'Plain text' },
   { id: 'json', label: 'JSON' },
   { id: 'javascript', label: 'JavaScript' },
+  { id: 'typescript', label: 'TypeScript' },
+  { id: 'jsx', label: 'JSX' },
+  { id: 'tsx', label: 'TSX' },
   { id: 'html', label: 'HTML' },
+  { id: 'xml', label: 'XML' },
   { id: 'css', label: 'CSS' },
+  { id: 'markdown', label: 'Markdown' },
+  { id: 'python', label: 'Python' },
+  { id: 'sql', label: 'SQL' },
+  { id: 'yaml', label: 'YAML' },
+  { id: 'php', label: 'PHP' },
 ];
 
 export interface CreateTextRequest {

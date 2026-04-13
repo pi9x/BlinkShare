@@ -15,4 +15,10 @@ public sealed record PeerState(
             LastSeenAtUtc = now,
             ReconnectGraceEndsAtUtc = now.AddSeconds(reconnectGraceSeconds)
         };
+
+    public PeerState MarkDisconnected(DateTimeOffset now, int reconnectGraceSeconds) =>
+        this with
+        {
+            ReconnectGraceEndsAtUtc = now.AddSeconds(reconnectGraceSeconds)
+        };
 }

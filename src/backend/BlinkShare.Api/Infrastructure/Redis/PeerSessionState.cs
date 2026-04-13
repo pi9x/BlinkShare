@@ -41,5 +41,17 @@ public sealed record PeerSessionState(
 
     public PeerSessionState WithActivity(Guid peerId, DateTimeOffset now) => TouchPeer(peerId, now);
 
+    public PeerSessionState MarkPeerDisconnected(Guid peerId, DateTimeOffset now)
+    {
+        var peers = Peers
+            .Select(peer => peer.PeerId == peerId ? peer.MarkDisconnected(now, ReconnectGraceSeconds) : peer)
+            .ToArray();
+
+        return this with
+        {
+            Peers = peers
+        };
+    }
+
     public PeerSessionState Expire() => this with { Status = PeerSessionStatus.Expired };
 }

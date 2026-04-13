@@ -10,46 +10,85 @@ import {
   input,
   output,
 } from '@angular/core';
-import { Compartment, EditorState } from '@codemirror/state';
-import { EditorView, lineNumbers } from '@codemirror/view';
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { css } from '@codemirror/lang-css';
 import { html } from '@codemirror/lang-html';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
+import { markdown } from '@codemirror/lang-markdown';
+import { php } from '@codemirror/lang-php';
+import { python } from '@codemirror/lang-python';
+import { sql } from '@codemirror/lang-sql';
+import { xml } from '@codemirror/lang-xml';
+import { yaml } from '@codemirror/lang-yaml';
+import {
+  bracketMatching,
+  HighlightStyle,
+  indentOnInput,
+  syntaxHighlighting,
+} from '@codemirror/language';
+import { Compartment, EditorSelection, EditorState } from '@codemirror/state';
+import {
+  EditorView,
+  drawSelection,
+  dropCursor,
+  highlightActiveLine,
+  keymap,
+  lineNumbers,
+} from '@codemirror/view';
+import { tags } from '@lezer/highlight';
 
 import { EditorLanguage } from '../../models/app.models';
+
+const blinkShareHighlightStyle = HighlightStyle.define([
+  { tag: tags.propertyName, color: '#5FC8A8' },
+  { tag: tags.string, color: '#F0A050' },
+  { tag: tags.number, color: '#F0A050' },
+  { tag: tags.bool, color: '#2EB88A' },
+  { tag: tags.null, color: '#7A9BAA' },
+  { tag: [tags.keyword, tags.operatorKeyword], color: '#C8DCEA' },
+  { tag: [tags.punctuation, tags.bracket], color: '#7A9BAA' },
+  { tag: tags.comment, color: '#446E7E' },
+]);
 
 @Component({
   selector: 'app-code-editor',
   standalone: true,
   imports: [CommonModule],
-  template: ` <div #host class="min-h-[18rem] w-full overflow-hidden rounded-[1.25rem] border border-slate-200 bg-slate-950"></div> `,
+  template: ` <div #host class="editor-shell min-h-[18rem] w-full overflow-hidden"></div> `,
   styles: [
     `
       :host {
         display: block;
       }
 
+      .editor-shell {
+        border-radius: var(--radius-ui);
+        overflow: hidden;
+        background: #111920;
+      }
+
       :host ::ng-deep .cm-editor {
         min-height: 18rem;
         background: transparent;
-        color: #e2e8f0;
+        color: #c8dcea;
+        border-radius: var(--radius-ui);
       }
 
       :host ::ng-deep .cm-scroller {
         font-family:
-          "IBM Plex Mono",
+          ui-monospace,
           "SFMono-Regular",
           Consolas,
           monospace;
         line-height: 1.6;
-        padding: 1rem 0;
+        padding: 1rem 0 4rem;
       }
 
       :host ::ng-deep .cm-gutters {
-        border-right: 1px solid rgb(148 163 184 / 0.18);
-        background: rgb(15 23 42 / 0.72);
-        color: rgb(148 163 184 / 0.9);
+        border-right: 1px solid #1a2530;
+        background: #111920;
+        color: #446e7e;
       }
 
       :host ::ng-deep .cm-content,
@@ -57,17 +96,26 @@ import { EditorLanguage } from '../../models/app.models';
         min-height: 18rem;
       }
 
+      :host ::ng-deep .cm-line {
+        padding: 0 1rem;
+      }
+
       :host ::ng-deep .cm-activeLine,
       :host ::ng-deep .cm-activeLineGutter {
-        background: rgb(30 41 59 / 0.85);
+        background: #15212a;
       }
 
       :host ::ng-deep .cm-focused {
         outline: none;
       }
 
+      :host ::ng-deep .cm-cursor,
+      :host ::ng-deep .cm-dropCursor {
+        border-left-color: #c8dcea;
+      }
+
       :host ::ng-deep .cm-selectionBackground {
-        background: rgb(13 148 136 / 0.38) !important;
+        background: rgb(68 110 126 / 0.35) !important;
       }
     `,
   ],
@@ -76,6 +124,7 @@ import { EditorLanguage } from '../../models/app.models';
 export class CodeEditorComponent {
   private readonly languageCompartment = new Compartment();
   private readonly readOnlyCompartment = new Compartment();
+  private readonly editableCompartment = new Compartment();
   private readonly wrapCompartment = new Compartment();
   private readonly destroyRef = inject(DestroyRef);
 
@@ -124,7 +173,10 @@ export class CodeEditorComponent {
       }
 
       this.view.dispatch({
-        effects: this.readOnlyCompartment.reconfigure(EditorState.readOnly.of(this.readOnly())),
+        effects: [
+          this.readOnlyCompartment.reconfigure(EditorState.readOnly.of(this.readOnly())),
+          this.editableCompartment.reconfigure(EditorView.editable.of(!this.readOnly())),
+        ],
       });
     });
 
@@ -150,12 +202,51 @@ export class CodeEditorComponent {
         doc: this.value(),
         extensions: [
           lineNumbers(),
+          drawSelection(),
+          dropCursor(),
+          highlightActiveLine(),
+          indentOnInput(),
+          bracketMatching(),
+          closeBrackets(),
+          syntaxHighlighting(blinkShareHighlightStyle, { fallback: true }),
           this.languageCompartment.of(this.createLanguageExtension(this.language())),
           this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly())),
+          this.editableCompartment.of(EditorView.editable.of(!this.readOnly())),
           this.wrapCompartment.of(this.wrap() ? EditorView.lineWrapping : []),
+          EditorState.allowMultipleSelections.of(true),
+          EditorView.contentAttributes.of({
+            tabindex: '0',
+            spellcheck: 'false',
+            autocorrect: 'off',
+            autocapitalize: 'off',
+          }),
+          keymap.of([
+            {
+              key: 'Tab',
+              run: (view) => {
+                if (this.readOnly()) {
+                  return false;
+                }
+
+                const changes = view.state.changeByRange((range) => ({
+                  changes: { from: range.from, to: range.to, insert: '  ' },
+                  range: EditorSelection.cursor(range.from + 2),
+                }));
+
+                view.dispatch(changes);
+                return true;
+              },
+            },
+            ...closeBracketsKeymap,
+          ]),
           EditorView.theme({
             '&': {
               height: '100%',
+              borderRadius: 'var(--radius-ui)',
+              backgroundColor: '#111920',
+            },
+            '.cm-content': {
+              caretColor: '#C8DCEA',
             },
           }),
           EditorView.updateListener.of((update) => {
@@ -168,6 +259,10 @@ export class CodeEditorComponent {
       parent: host,
     });
 
+    if (!this.readOnly()) {
+      queueMicrotask(() => this.view?.focus());
+    }
+
     this.destroyRef.onDestroy(() => {
       this.view?.destroy();
       this.view = null;
@@ -178,12 +273,30 @@ export class CodeEditorComponent {
     switch (language) {
       case 'javascript':
         return javascript();
+      case 'typescript':
+        return javascript({ typescript: true });
+      case 'jsx':
+        return javascript({ jsx: true });
+      case 'tsx':
+        return javascript({ typescript: true, jsx: true });
       case 'json':
         return json();
       case 'html':
         return html();
+      case 'xml':
+        return xml();
       case 'css':
         return css();
+      case 'markdown':
+        return markdown();
+      case 'python':
+        return python();
+      case 'sql':
+        return sql();
+      case 'yaml':
+        return yaml();
+      case 'php':
+        return php();
       default:
         return [];
     }
