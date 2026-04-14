@@ -29,12 +29,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSignalR()
             .AddStackExchangeRedis(redisConnectionString);
 
-        services.AddPooledDbContextFactory<BlinkShareDbContext>((serviceProvider, options) =>
+        services.AddPooledDbContextFactory<BlinkShareDbContext>(options =>
         {
-            var connectionString = serviceProvider.GetRequiredService<IConfiguration>().GetConnectionString("Postgres")
-                ?? throw new InvalidOperationException("Connection string 'Postgres' was not found.");
-
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseNpgsql(postgresConnectionString, npgsql =>
             {
                 npgsql.EnableRetryOnFailure(3);
                 npgsql.CommandTimeout(5);
@@ -47,7 +44,7 @@ public static class InfrastructureServiceCollectionExtensions
             .AddNpgSql(postgresConnectionString, name: "postgres")
             .AddRedis(redisConnectionString, name: "redis");
 
-        services.AddSingleton(_ =>
+        services.AddSingleton<ConfigurationOptions>(_ =>
         {
             var redisOptions = ConfigurationOptions.Parse(redisConnectionString, ignoreUnknown: true);
             redisOptions.AbortOnConnectFail = false;
@@ -55,13 +52,13 @@ public static class InfrastructureServiceCollectionExtensions
         });
 
         services.AddSingleton<IConnectionMultiplexer>(serviceProvider =>
-        {
-            var redisOptions = serviceProvider.GetRequiredService<ConfigurationOptions>();
-            return ConnectionMultiplexer.Connect(redisOptions);
-        });
+            ConnectionMultiplexer.Connect(serviceProvider.GetRequiredService<ConfigurationOptions>()));
 
         services.AddOptions<ObjectStorageOptions>()
-            .Bind(configuration.GetSection("ObjectStorage"));
+            .Bind(configuration.GetSection("ObjectStorage"))
+            .ValidateDataAnnotations()
+            .Validate(static options => !string.IsNullOrWhiteSpace(options.BucketName), "ObjectStorage:BucketName is required.")
+            .ValidateOnStart();
 
         services.AddOptions<ShareUnlockProofOptions>()
             .Bind(configuration.GetSection("Shares:Unlock"));
@@ -70,7 +67,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<ICodeGenerator, RandomCodeGenerator>();
         services.AddSingleton<IPasscodeHasher, Pbkdf2PasscodeHasher>();
         services.AddSingleton<IShareUnlockProofService, DataProtectionShareUnlockProofService>();
-        services.AddSingleton<IObjectStorage, DevelopmentObjectStorage>();
+        services.AddSingleton<IObjectStorage, S3CompatibleObjectStorage>();
         services.AddSingleton<IPeerSessionStore, RedisPeerSessionStore>();
 
         return services;

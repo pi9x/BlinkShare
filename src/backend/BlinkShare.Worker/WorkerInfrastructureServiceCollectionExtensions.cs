@@ -29,10 +29,13 @@ public static class WorkerInfrastructureServiceCollectionExtensions
         });
 
         services.AddOptions<ObjectStorageOptions>()
-            .Bind(configuration.GetSection("ObjectStorage"));
+            .Bind(configuration.GetSection("ObjectStorage"))
+            .ValidateDataAnnotations()
+            .Validate(static options => !string.IsNullOrWhiteSpace(options.BucketName), "ObjectStorage:BucketName is required.")
+            .ValidateOnStart();
 
         services.AddSingleton<IClock, SystemClock>();
-        services.AddSingleton<IObjectStorage, DevelopmentObjectStorage>();
+        services.AddSingleton<IObjectStorage, S3CompatibleObjectStorage>();
 
         return services;
     }

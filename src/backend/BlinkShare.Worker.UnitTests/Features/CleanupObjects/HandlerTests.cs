@@ -1,7 +1,7 @@
 using BlinkShare.Api.Common.Time;
-using BlinkShare.Api.Infrastructure.ObjectStorage;
 using BlinkShare.Api.Infrastructure.Persistence;
 using BlinkShare.Worker.Features.CleanupObjects;
+using BlinkShare.Worker.UnitTests.TestDoubles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -13,10 +13,7 @@ public sealed class HandlerTests
     public async Task Expired_file_objects_are_deleted_and_marked_cleaned()
     {
         var dbContextFactory = CreateDbContextFactory(Guid.NewGuid().ToString("N"));
-        var objectStorage = new DevelopmentObjectStorage(Options.Create(new ObjectStorageOptions
-        {
-            BaseUrl = "https://object-storage.test"
-        }));
+        var objectStorage = new FakeObjectStorage();
 
         await using (var dbContext = await dbContextFactory.CreateDbContextAsync())
         {

@@ -3,6 +3,7 @@ using BlinkShare.Api.Features.Shares.CreateFileUpload;
 using BlinkShare.Api.Infrastructure.ObjectStorage;
 using BlinkShare.Api.Infrastructure.Persistence;
 using BlinkShare.Api.Infrastructure.Security;
+using BlinkShare.Api.UnitTests.TestDoubles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -56,7 +57,7 @@ public sealed class HandlerTests
                 FreeTierTtlMinutes = 5
             })),
             new FixedCodeGenerator("FILE1234"),
-            new DevelopmentObjectStorage(Options.Create(new ObjectStorageOptions { BaseUrl = "https://object-storage.test" })),
+            new FakeObjectStorage(),
             new FakeClock(new DateTimeOffset(2026, 4, 12, 10, 30, 0, TimeSpan.Zero)),
             Options.Create(new CreateFileUploadOptions
             {

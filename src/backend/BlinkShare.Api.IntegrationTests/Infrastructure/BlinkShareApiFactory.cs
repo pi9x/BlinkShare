@@ -1,4 +1,5 @@
 using BlinkShare.Api.Common.Time;
+using BlinkShare.Api.Infrastructure.ObjectStorage;
 using BlinkShare.Api.Infrastructure.Persistence;
 using BlinkShare.Api.Infrastructure.Security;
 using DotNet.Testcontainers.Builders;
@@ -33,8 +34,7 @@ public sealed class BlinkShareApiFactory : WebApplicationFactory<Program>, IAsyn
                 ["Shares:CreateText:FreeTierTtlMinutes"] = "5",
                 ["Shares:CreateFileUpload:MaxFileSizeBytes"] = "2048",
                 ["Shares:CreateFileUpload:FreeTierTtlMinutes"] = "5",
-                ["Shares:Unlock:LifetimeMinutes"] = "5",
-                ["ObjectStorage:BaseUrl"] = "https://object-storage.test"
+                ["Shares:Unlock:LifetimeMinutes"] = "5"
             });
         });
 
@@ -45,6 +45,8 @@ public sealed class BlinkShareApiFactory : WebApplicationFactory<Program>, IAsyn
 
             services.RemoveAll<ICodeGenerator>();
             services.AddSingleton<ICodeGenerator>(new FixedCodeGenerator("TEST1234"));
+            services.RemoveAll<IObjectStorage>();
+            services.AddSingleton<IObjectStorage, FakeObjectStorage>();
         });
     }
 
@@ -93,5 +95,25 @@ public sealed class BlinkShareApiFactory : WebApplicationFactory<Program>, IAsyn
     private sealed class FixedCodeGenerator(string code) : ICodeGenerator
     {
         public string GenerateShareCode() => code;
+    }
+
+    private sealed class FakeObjectStorage : IObjectStorage
+    {
+        public Task<ObjectStorageUploadResult> CreateUploadTargetAsync(
+            ObjectStorageUploadRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ObjectStorageUploadResult(
+                request.StorageKey,
+                $"https://object-storage.test/upload/{Uri.EscapeDataString(request.StorageKey)}",
+                "PUT"));
+
+        public Task<ObjectStorageDownloadResult> CreateDownloadTargetAsync(
+            ObjectStorageDownloadRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ObjectStorageDownloadResult(
+                request.StorageKey,
+                $"https://object-storage.test/download/{Uri.EscapeDataString(request.StorageKey)}"));
+
+        public Task DeleteObjectAsync(string storageKey, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

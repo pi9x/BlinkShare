@@ -3,8 +3,8 @@ using BlinkShare.Api.Features.Shares.RequestDownload;
 using BlinkShare.Api.Infrastructure.ObjectStorage;
 using BlinkShare.Api.Infrastructure.Persistence;
 using BlinkShare.Api.Infrastructure.Security;
+using BlinkShare.Api.UnitTests.TestDoubles;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace BlinkShare.Api.UnitTests.Features.Shares.RequestDownload;
 
@@ -58,7 +58,7 @@ public sealed class HandlerTests
     private static Handler CreateHandler(IDbContextFactory<BlinkShareDbContext> dbContextFactory) =>
         new(
             dbContextFactory,
-            new DevelopmentObjectStorage(Options.Create(new ObjectStorageOptions { BaseUrl = "https://object-storage.test" })),
+            new FakeObjectStorage(),
             new FakeShareUnlockProofService(),
             new FakeClock(new DateTimeOffset(2026, 4, 12, 10, 30, 0, TimeSpan.Zero)));
 
