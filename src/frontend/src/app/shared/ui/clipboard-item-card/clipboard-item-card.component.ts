@@ -20,20 +20,26 @@ import { formatBytes } from '../../utils/bytes';
 
         <div class="flex flex-wrap items-center justify-end gap-2">
           <p class="text-xs font-semibold" style="color: var(--muted-label);">{{ item().createdAtUtc | date: 'shortTime' }}</p>
-          @if (copied()) {
+          @if (item().kind === 'text' && copied()) {
             <span class="text-xs font-semibold" style="color: var(--surface-strong);">Copied</span>
           }
           <button
             class="icon-button h-9 w-9"
-            [class.icon-button-success]="copied()"
+            [class.icon-button-success]="item().kind === 'text' && copied()"
             type="button"
-            (click)="copy.emit()"
-            [attr.aria-label]="copied() ? 'Copied' : 'Copy'"
-            [attr.title]="copied() ? 'Copied to clipboard' : 'Copy'"
+            (click)="item().kind === 'text' ? copy.emit() : download.emit()"
+            [attr.aria-label]="item().kind === 'text' ? (copied() ? 'Copied' : 'Copy') : 'Download'"
+            [attr.title]="item().kind === 'text' ? (copied() ? 'Copied to clipboard' : 'Copy') : 'Download file'"
           >
-            @if (copied()) {
+            @if (item().kind === 'text' && copied()) {
               <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                 <path d="m5 12 5 5L20 7" />
+              </svg>
+            } @else if (item().kind === 'file-metadata') {
+              <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="M7 10 12 15 17 10" />
+                <path d="M12 15V3" />
               </svg>
             } @else {
               <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
@@ -62,6 +68,7 @@ export class ClipboardItemCardComponent {
   public readonly item = input.required<LocalClipboardItem>();
   public readonly copied = input(false);
   public readonly copy = output<void>();
+  public readonly download = output<void>();
 
   protected readonly formatBytes = formatBytes;
 }

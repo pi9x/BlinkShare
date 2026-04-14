@@ -249,7 +249,7 @@ export class WorkspaceStore {
     }
   }
 
-  public async sendDraftToSession(): Promise<void> {
+  public async sendDraftToSession(textToSend?: string): Promise<boolean> {
     const session = this.state().session;
     if (!session) {
       this.state.update((state) => ({
@@ -259,8 +259,10 @@ export class WorkspaceStore {
           message: 'Create or join a session before relaying text.',
         },
       }));
-      return;
+      return false;
     }
+
+    const payload = textToSend ?? this.state().draft.text;
 
     this.state.update((state) => ({
       ...state,
@@ -269,7 +271,7 @@ export class WorkspaceStore {
     }));
 
     try {
-      const response = await this.realtimeService.publishText(session, this.state().draft.text);
+      const response = await this.realtimeService.publishText(session, payload);
 
       this.appendHistory({
         id: crypto.randomUUID(),
@@ -286,8 +288,10 @@ export class WorkspaceStore {
         busyAction: null,
         sessionStatus: 'connected',
       }));
+      return true;
     } catch (error) {
       this.failSession(error, 'session');
+      return false;
     }
   }
 

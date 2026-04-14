@@ -1,13 +1,16 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, ViewChild, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
 import { WorkspaceStore } from './workspace.store';
+import { SharesApi } from '../../core/api/shares.api';
 import { ClipboardItemCardComponent } from '../../shared/ui/clipboard-item-card/clipboard-item-card.component';
 import { CodeEditorComponent } from '../../shared/ui/code-editor/code-editor.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state/empty-state.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge/status-badge.component';
 import { EDITOR_LANGUAGES, EditorLanguage } from '../../shared/models/app.models';
+import { toAppError } from '../../core/http/api-error.mapper';
 import { copyText } from '../../shared/utils/clipboard';
 import { formatBytes } from '../../shared/utils/bytes';
 import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
@@ -28,8 +31,8 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
     <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1.4fr)_18rem]">
       <section class="space-y-3.5">
         <article class="surface-card p-3.5">
-          <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <div class="space-y-2.5">
+          <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-stretch">
+            <div class="flex h-full flex-col justify-between gap-2.5">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your code</p>
@@ -84,7 +87,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
               </div>
             </div>
 
-            <div class="surface-panel p-3.5">
+            <div class="surface-panel flex h-full flex-col justify-start p-3.5">
               <label class="field-label">Connect to code</label>
               <div class="mt-2 flex items-center gap-2">
                 <input
@@ -104,8 +107,8 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
           </div>
         </article>
 
-        <article class="surface-card p-2.5">
-          <div class="mb-2.5 flex items-center gap-2 overflow-x-auto pb-1">
+        <article class="surface-card p-3.5">
+          <div class="mb-2.5 flex items-center justify-between gap-2 overflow-x-auto pb-1">
             <div class="workspace-compact-select-shell">
               <select
                 class="workspace-compact-select"
@@ -117,6 +120,14 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
                 }
               </select>
             </div>
+            @if (hasDraftText()) {
+              <button class="icon-button icon-button-active shrink-0" type="button" (click)="sendDraft()" [disabled]="store.busyAction() !== null" aria-label="Send to session" title="Send to session">
+                <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                  <path d="M22 2 11 13" />
+                  <path d="M22 2 15 22l-4-9-9-4Z" />
+                </svg>
+              </button>
+            }
           </div>
 
           <div>
@@ -126,16 +137,6 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
               [wrap]="store.draft().wrap"
               (contentChanged)="store.setDraftText($event)"
             />
-          </div>
-
-          <div class="mt-2.5 flex items-center justify-between gap-3 px-1">
-            <p class="text-xs font-semibold" style="color: var(--muted-label);">Press Tab to indent · relay to active session</p>
-            <button class="icon-button icon-button-active shrink-0" type="button" (click)="store.sendDraftToSession()" [disabled]="store.busyAction() !== null" aria-label="Send to session" title="Send to session">
-              <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
-                <path d="M22 2 11 13" />
-                <path d="M22 2 15 22l-4-9-9-4Z" />
-              </svg>
-            </button>
           </div>
         </article>
 
@@ -150,33 +151,26 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
               }
             </div>
 
-            <button class="icon-button" type="button" (click)="fileInput.click()" aria-label="Choose file" title="Choose file">
-              <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <path d="M17 8 12 3 7 8" />
-                <path d="M12 3v12" />
-              </svg>
-            </button>
+            <div class="flex items-center gap-2">
+              <button class="icon-button" type="button" (click)="fileInput.click()" aria-label="Choose file" title="Choose file">
+                <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <path d="M17 8 12 3 7 8" />
+                  <path d="M12 3v12" />
+                </svg>
+              </button>
+              @if (selectedFileName()) {
+                <button class="icon-button icon-button-active" type="button" (click)="relayFileMetadata()" [disabled]="store.busyAction() !== null" aria-label="Send file info" title="Send file info">
+                  <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                    <path d="M22 2 11 13" />
+                    <path d="M22 2 15 22l-4-9-9-4Z" />
+                  </svg>
+                </button>
+              }
+            </div>
           </div>
 
           <input #fileInput type="file" class="hidden" (change)="onFileChosen($event)" />
-
-          @if (selectedFileName()) {
-            <div class="mt-2.5 grid gap-2 sm:grid-cols-2">
-              <button class="icon-button icon-button-active w-full sm:w-auto justify-self-start" type="button" (click)="shareFile()" [disabled]="store.busyAction() !== null" aria-label="Create file share" title="Create file share">
-                <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <path d="M14 2v6h6" />
-                </svg>
-              </button>
-              <button class="icon-button w-full sm:w-auto justify-self-start" type="button" (click)="relayFileMetadata()" [disabled]="store.busyAction() !== null" aria-label="Send file info" title="Send file info">
-                <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
-                  <path d="M22 2 11 13" />
-                  <path d="M22 2 15 22l-4-9-9-4Z" />
-                </svg>
-              </button>
-            </div>
-          }
         </article>
       </section>
 
@@ -225,7 +219,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
           <div class="space-y-2.5">
             @if (store.history().length) {
               @for (item of store.history(); track item.id) {
-                <app-clipboard-item-card [item]="item" [copied]="isCopied('history:' + item.id)" (copy)="copyItem(item)" />
+                <app-clipboard-item-card [item]="item" [copied]="isCopied('history:' + item.id)" (copy)="copyItem(item)" (download)="downloadItem(item)" />
               }
             } @else {
               <app-empty-state eyebrow="Empty" title="Nothing yet" copy="Sent and received items show up here." />
@@ -290,6 +284,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
 export class WorkspacePageComponent {
   private readonly route = inject(ActivatedRoute);
   protected readonly store = inject(WorkspaceStore);
+  private readonly sharesApi = inject(SharesApi);
   protected readonly joinCode = signal('');
   protected readonly copiedKey = signal<string | null>(null);
   protected readonly snackbarMessage = signal<string | null>(null);
@@ -299,6 +294,7 @@ export class WorkspacePageComponent {
   private copiedHandle: ReturnType<typeof setTimeout> | null = null;
   private snackbarHandle: ReturnType<typeof setTimeout> | null = null;
   @ViewChild('fileInput') private readonly fileInput?: { nativeElement: HTMLInputElement };
+  @ViewChild(CodeEditorComponent) private readonly codeEditor?: CodeEditorComponent;
 
   public constructor() {
     const routeCode = this.route.snapshot.paramMap.get('code');
@@ -349,15 +345,6 @@ export class WorkspacePageComponent {
     return `${file.type || 'application/octet-stream'} · ${formatBytes(file.size)}`;
   }
 
-  protected async shareFile(): Promise<void> {
-    const file = this.selectedFile();
-    if (!file) {
-      return;
-    }
-
-    await this.store.createFileShare(file);
-  }
-
   protected async relayFileMetadata(): Promise<void> {
     const file = this.selectedFile();
     if (!file) {
@@ -365,6 +352,7 @@ export class WorkspacePageComponent {
     }
 
     await this.store.publishFileMetadata(file);
+    this.resetSelectedFile();
   }
 
   protected isCopied(key: string): boolean {
@@ -390,6 +378,37 @@ export class WorkspacePageComponent {
     const copied = await copyText(item.fileName ?? '');
     if (copied && item.id) {
       this.flashCopied(`history:${item.id}`);
+    }
+  }
+
+  protected async downloadItem(item: { kind: string; shareCode?: string }): Promise<void> {
+    if (item.kind !== 'file-metadata') {
+      return;
+    }
+
+    if (!item.shareCode) {
+      this.showSnackbar('This file item contains metadata only and has no downloadable share.');
+      return;
+    }
+
+    try {
+      const response = await firstValueFrom(this.sharesApi.requestDownload(item.shareCode));
+      window.open(response.downloadUrl, '_blank', 'noopener');
+    } catch (error) {
+      this.showSnackbar(toAppError(error).message);
+    }
+  }
+
+  protected async sendDraft(): Promise<void> {
+    const currentText = this.store.draft().text;
+    if (!currentText.trim()) {
+      return;
+    }
+
+    const sent = await this.store.sendDraftToSession(currentText);
+    if (sent) {
+      this.store.clearDraft();
+      this.codeEditor?.clearContent();
     }
   }
 
@@ -433,6 +452,19 @@ export class WorkspacePageComponent {
   protected readonly formatDateTime = formatDateTime;
   protected readonly formatRelativeTime = formatRelativeTime;
   protected readonly formatBytes = formatBytes;
+
+  protected hasDraftText(): boolean {
+    return this.store.draft().text.trim().length > 0;
+  }
+
+  private resetSelectedFile(): void {
+    this.selectedFile.set(null);
+
+    const input = this.fileInput?.nativeElement;
+    if (input) {
+      input.value = '';
+    }
+  }
 
   protected quotaTierLabel(tier: number): string {
     switch (tier) {

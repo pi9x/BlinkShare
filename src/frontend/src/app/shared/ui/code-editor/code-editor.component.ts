@@ -55,7 +55,7 @@ const blinkShareHighlightStyle = HighlightStyle.define([
   selector: 'app-code-editor',
   standalone: true,
   imports: [CommonModule],
-  template: ` <div #host class="editor-shell min-h-[18rem] w-full overflow-hidden"></div> `,
+  template: ` <div #host class="editor-shell w-full overflow-hidden"></div> `,
   styles: [
     `
       :host {
@@ -63,26 +63,30 @@ const blinkShareHighlightStyle = HighlightStyle.define([
       }
 
       .editor-shell {
+        height: 34rem;
         border-radius: var(--radius-ui);
         overflow: hidden;
         background: #111920;
       }
 
       :host ::ng-deep .cm-editor {
-        min-height: 18rem;
+        height: 100%;
         background: transparent;
         color: #c8dcea;
         border-radius: var(--radius-ui);
       }
 
       :host ::ng-deep .cm-scroller {
+        height: 100%;
+        overflow: auto;
+        font-size: 0.93rem;
         font-family:
           ui-monospace,
           "SFMono-Regular",
           Consolas,
           monospace;
-        line-height: 1.6;
-        padding: 1rem 0 4rem;
+        line-height: 1.5;
+        padding: 1rem 0;
       }
 
       :host ::ng-deep .cm-gutters {
@@ -93,7 +97,7 @@ const blinkShareHighlightStyle = HighlightStyle.define([
 
       :host ::ng-deep .cm-content,
       :host ::ng-deep .cm-gutter {
-        min-height: 18rem;
+        min-height: 100%;
       }
 
       :host ::ng-deep .cm-line {
@@ -116,6 +120,12 @@ const blinkShareHighlightStyle = HighlightStyle.define([
 
       :host ::ng-deep .cm-selectionBackground {
         background: rgb(68 110 126 / 0.35) !important;
+      }
+
+      @media (max-width: 768px) {
+        .editor-shell {
+          height: 24rem;
+        }
       }
     `,
   ],
@@ -266,6 +276,25 @@ export class CodeEditorComponent {
     this.destroyRef.onDestroy(() => {
       this.view?.destroy();
       this.view = null;
+    });
+  }
+
+  public clearContent(): void {
+    if (!this.view) {
+      return;
+    }
+
+    const currentValue = this.view.state.doc.toString();
+    if (!currentValue.length) {
+      return;
+    }
+
+    this.view.dispatch({
+      changes: {
+        from: 0,
+        to: currentValue.length,
+        insert: '',
+      },
     });
   }
 
