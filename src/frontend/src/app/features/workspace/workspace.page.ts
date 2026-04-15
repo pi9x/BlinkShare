@@ -28,19 +28,19 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
   ],
   providers: [WorkspaceStore],
   template: `
-    <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1.4fr)_18rem]">
+    <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1.4fr)_27rem]">
       <section class="space-y-3.5">
         <article class="surface-card p-3.5">
-          <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-stretch">
+          <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-stretch">
             <div class="flex h-full flex-col justify-between gap-2.5">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your code</p>
                   <div class="mt-1 flex h-[2.3rem] items-center">
                     @if (store.session(); as session) {
-                      <h2 class="text-[1.8rem] leading-none font-bold tracking-tight" style="color: var(--text-strong);">{{ session.code }}</h2>
+                      <h2 class="font-code text-[1.8rem] leading-none font-bold tracking-[0.08em]" style="color: var(--text-strong);">{{ session.code }}</h2>
                     } @else {
-                      <h2 class="text-[1.8rem] leading-none font-bold tracking-tight" style="color: var(--text-strong);">Not connected</h2>
+                      <h2 class="whitespace-nowrap text-[1.8rem] leading-none font-bold tracking-tight" style="color: var(--text-strong);">Not connected</h2>
                     }
                   </div>
                 </div>
@@ -87,11 +87,11 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
               </div>
             </div>
 
-            <div class="surface-panel flex h-full flex-col justify-start p-3.5">
+            <div class="surface-panel flex h-full flex-col justify-start p-2.5">
               <label class="field-label">Connect to code</label>
-              <div class="mt-2 flex items-center gap-2">
+              <div class="mt-2 flex items-center gap-1.5">
                 <input
-                  class="field-input h-[2.15rem] px-3 py-0 text-sm leading-[2.15rem] font-code uppercase tracking-[0.22em]"
+                  class="field-input h-[2.15rem] min-w-0 px-2.5 py-0 text-sm leading-[2.15rem] font-code uppercase tracking-[0.16em]"
                   [value]="joinCode()"
                   (input)="joinCode.set(($any($event.target).value || '').toUpperCase())"
                   placeholder="ABCD1234"

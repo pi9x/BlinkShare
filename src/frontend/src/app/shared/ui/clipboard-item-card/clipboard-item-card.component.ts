@@ -10,19 +10,16 @@ import { formatBytes } from '../../utils/bytes';
   imports: [DatePipe],
   template: `
     <article class="space-y-2">
-      <div class="flex items-start justify-between gap-2">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-[0.02em]" style="color: var(--muted-label);">
+      <div class="flex min-h-9 items-center justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-xs leading-none font-bold uppercase tracking-[0.02em]" style="color: var(--muted-label);">
             <span [style.color]="item().direction === 'received' ? 'var(--success)' : 'var(--accent-warm)'">•</span>
             {{ item().direction }} · {{ item().kind === 'text' ? (item().language || 'plain') : 'file' }}
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          <p class="text-xs font-semibold" style="color: var(--muted-label);">{{ item().createdAtUtc | date: 'shortTime' }}</p>
-          @if (item().kind === 'text' && copied()) {
-            <span class="text-xs font-semibold" style="color: var(--surface-strong);">Copied</span>
-          }
+        <div class="flex shrink-0 items-center justify-end gap-2">
+          <p class="text-xs leading-none font-semibold" style="color: var(--muted-label);">{{ item().createdAtUtc | date: 'shortTime' }}</p>
           <button
             class="icon-button h-9 w-9"
             [class.icon-button-success]="item().kind === 'text' && copied()"

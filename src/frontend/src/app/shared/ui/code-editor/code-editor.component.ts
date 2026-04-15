@@ -82,7 +82,8 @@ const blinkShareHighlightStyle = HighlightStyle.define([
         font-size: 0.93rem;
         font-family:
           ui-monospace,
-          "SFMono-Regular",
+          SFMono-Regular,
+          Menlo,
           Consolas,
           monospace;
         line-height: 1.5;
