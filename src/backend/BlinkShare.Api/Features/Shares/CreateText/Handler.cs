@@ -1,4 +1,5 @@
 using System.Text;
+using BlinkShare.Api.Common.Auth;
 using BlinkShare.Api.Common.Results;
 using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Infrastructure.Persistence;
@@ -12,6 +13,7 @@ public sealed class Handler(
     IDbContextFactory<BlinkShareDbContext> dbContextFactory,
     Validator validator,
     ICodeGenerator codeGenerator,
+    ICurrentAccountAccessor currentAccountAccessor,
     IClock clock,
     IOptions<CreateTextOptions> options) : BlinkShare.Api.Common.DependencyInjection.ISliceService
 {
@@ -19,7 +21,12 @@ public sealed class Handler(
 
     public async Task<Result<Response>> HandleAsync(Command command, CancellationToken cancellationToken)
     {
-        var validationResult = validator.Validate(command);
+        var effectiveCommand = command with
+        {
+            Tier = currentAccountAccessor.GetCurrentAccount()?.Tier ?? AccountTier.Anonymous
+        };
+
+        var validationResult = validator.Validate(effectiveCommand);
         if (validationResult.IsFailure)
         {
             return Result<Response>.Failure(validationResult.Error!);
@@ -35,12 +42,11 @@ public sealed class Handler(
 
         var createdAtUtc = clock.UtcNow;
         var expiresAtUtc = createdAtUtc.AddMinutes(options.Value.FreeTierTtlMinutes);
-        var text = command.Text!;
+        var text = effectiveCommand.Text!;
 
         var share = new Share(
             id: Guid.NewGuid(),
             code: codeResult.Value!,
-            tier: command.Tier,
             mode: ShareMode.StoredShare,
             kind: ShareKind.Text,
             status: ShareStatus.Ready,
@@ -71,7 +77,6 @@ public sealed class Handler(
         {
             var code = codeGenerator.GenerateShareCode();
             var exists = await dbContext.Shares
-                .AsNoTracking()
                 .AnyAsync(share => share.Code == code, cancellationToken);
 
             if (!exists)

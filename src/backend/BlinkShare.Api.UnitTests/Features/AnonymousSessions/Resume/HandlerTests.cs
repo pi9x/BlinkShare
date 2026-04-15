@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Features.AnonymousSessions;
 using BlinkShare.Api.Features.AnonymousSessions.Resume;
@@ -18,7 +20,6 @@ public sealed class HandlerTests
             "TEST1234",
             PeerSessionStatus.Active,
             now,
-            now.AddMinutes(5),
             now,
             60,
             [new PeerState(peerId, "HASH", now, now, now.AddSeconds(60))]));
@@ -31,26 +32,31 @@ public sealed class HandlerTests
     }
 
     [Fact]
-    public async Task Expired_session_returns_failure()
+    public async Task Elapsed_reconnect_grace_returns_failure()
     {
         var now = new DateTimeOffset(2026, 4, 12, 10, 30, 0, TimeSpan.Zero);
         var sessionId = Guid.NewGuid();
         var peerId = Guid.NewGuid();
+        const string resumeToken = "resume-token";
         var store = new TestPeerSessionStore(new PeerSessionState(
             sessionId,
             "TEST1234",
             PeerSessionStatus.Active,
             now.AddMinutes(-10),
-            now.AddSeconds(-1),
             now.AddMinutes(-1),
             60,
-            [new PeerState(peerId, "HASH", now, now, now.AddSeconds(60))]));
+            [new PeerState(
+                peerId,
+                Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(resumeToken))),
+                now.AddMinutes(-10),
+                now.AddMinutes(-1),
+                now.AddSeconds(-1))]));
         var handler = new Handler(new PeerSessionAccessService(store, new FakeClock(now)));
 
-        var result = await handler.HandleAsync(new Request(sessionId, peerId, "wrong"), CancellationToken.None);
+        var result = await handler.HandleAsync(new Request(sessionId, peerId, resumeToken), CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("session.expired", result.Error!.Code);
+        Assert.Equal("session.reconnect_grace_elapsed", result.Error!.Code);
     }
 
     private sealed class FakeClock(DateTimeOffset utcNow) : IClock

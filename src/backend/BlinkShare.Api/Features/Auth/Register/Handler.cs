@@ -29,7 +29,6 @@ public sealed class Handler(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var exists = await dbContext.Accounts
-            .AsNoTracking()
             .AnyAsync(account => account.NormalizedEmail == normalizedEmail, cancellationToken);
 
         if (exists)
@@ -43,6 +42,7 @@ public sealed class Handler(
             command.Email!.Trim(),
             normalizedEmail,
             passwordHasher.Hash(command.Password!),
+            AccountTier.Free,
             now,
             now);
 
@@ -64,6 +64,7 @@ public sealed class Handler(
         return Result<Response>.Success(new Response(
             account.Id,
             account.Email,
+            account.Tier,
             sessionToken,
             sessionExpiresAtUtc));
     }

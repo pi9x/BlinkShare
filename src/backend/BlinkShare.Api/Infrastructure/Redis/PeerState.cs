@@ -5,7 +5,8 @@ public sealed record PeerState(
     string ResumeTokenHash,
     DateTimeOffset JoinedAtUtc,
     DateTimeOffset LastSeenAtUtc,
-    DateTimeOffset ReconnectGraceEndsAtUtc)
+    DateTimeOffset ReconnectGraceEndsAtUtc,
+    bool IsConnected = true)
 {
     public bool IsReconnectValid(DateTimeOffset now) => ReconnectGraceEndsAtUtc >= now;
 
@@ -13,12 +14,14 @@ public sealed record PeerState(
         this with
         {
             LastSeenAtUtc = now,
-            ReconnectGraceEndsAtUtc = now.AddSeconds(reconnectGraceSeconds)
+            ReconnectGraceEndsAtUtc = now.AddSeconds(reconnectGraceSeconds),
+            IsConnected = true
         };
 
     public PeerState MarkDisconnected(DateTimeOffset now, int reconnectGraceSeconds) =>
         this with
         {
-            ReconnectGraceEndsAtUtc = now.AddSeconds(reconnectGraceSeconds)
+            ReconnectGraceEndsAtUtc = now.AddSeconds(reconnectGraceSeconds),
+            IsConnected = false
         };
 }

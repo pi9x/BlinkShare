@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 
 import { AnonymousSessionsApi } from '../../core/api/anonymous-sessions.api';
+import { AuthStore } from '../../core/auth/auth.store';
 import { HealthApi } from '../../core/api/health.api';
 import { QuotasApi } from '../../core/api/quotas.api';
 import { SharesApi } from '../../core/api/shares.api';
@@ -18,6 +19,7 @@ import { LocalHistoryStorage } from '../../core/storage/local-history.storage';
 import { SessionRestoreStorage } from '../../core/storage/session-restore.storage';
 import { AppError } from '../../core/errors/app-error.model';
 import { toAppError } from '../../core/http/api-error.mapper';
+import { formatBytes } from '../../shared/utils/bytes';
 import {
   CreateOrJoinAnonymousSessionResponse,
   EditorDraft,
@@ -25,12 +27,14 @@ import {
   HealthResponse,
   LocalClipboardItem,
   QuotaUsageResponse,
-  ShareTier,
   StoredAnonymousSession,
 } from '../../shared/models/app.models';
 
 type SessionStatus = 'idle' | 'creating' | 'connected' | 'reconnecting' | 'error';
 type BusyAction = 'share' | 'session' | 'file-share' | 'file-session' | null;
+
+const AnonymousMaxFileSizeBytes = 512 * 1024;
+const FreeMaxFileSizeBytes = 1024 * 1024;
 
 interface WorkspaceState {
   initialized: boolean;
@@ -58,6 +62,7 @@ interface WorkspaceState {
 export class WorkspaceStore {
   private readonly destroyRef = inject(DestroyRef);
   private readonly sharesApi = inject(SharesApi);
+  private readonly authStore = inject(AuthStore);
   private readonly anonymousSessionsApi = inject(AnonymousSessionsApi);
   private readonly healthApi = inject(HealthApi);
   private readonly quotasApi = inject(QuotasApi);
@@ -178,6 +183,10 @@ export class WorkspaceStore {
   }
 
   public async createSession(): Promise<void> {
+    if (this.state().session) {
+      await this.disconnectSession();
+    }
+
     await this.createOrJoinSession(null);
   }
 
@@ -218,7 +227,6 @@ export class WorkspaceStore {
     try {
       const response = await firstValueFrom(
         this.sharesApi.createText({
-          tier: ShareTier.Free,
           text: this.state().draft.text,
         }),
       );
@@ -329,6 +337,7 @@ export class WorkspaceStore {
         fileName: response.fileName,
         contentType: response.contentType,
         sizeBytes: response.sizeBytes,
+        shareCode: response.shareCode ?? undefined,
         createdAtUtc: response.publishedAtUtc,
         sessionCode: session.code,
       });
@@ -342,7 +351,25 @@ export class WorkspaceStore {
     }
   }
 
-  public async createFileShare(file: File): Promise<void> {
+  public async createFileShare(
+    file: File,
+    onProgress?: (percent: number) => void,
+  ): Promise<boolean> {
+    const maxFileSizeBytes = this.authStore.authenticated()
+      ? FreeMaxFileSizeBytes
+      : AnonymousMaxFileSizeBytes;
+
+    if (file.size > maxFileSizeBytes) {
+      this.state.update((state) => ({
+        ...state,
+        sessionError: {
+          kind: 'validation',
+          message: `File size cannot exceed ${formatBytes(maxFileSizeBytes)}.`,
+        },
+      }));
+      return false;
+    }
+
     this.state.update((state) => ({
       ...state,
       busyAction: 'file-share',
@@ -350,37 +377,41 @@ export class WorkspaceStore {
     }));
 
     try {
+      onProgress?.(0);
+
       const created = await firstValueFrom(
         this.sharesApi.createFileUpload({
-          tier: ShareTier.Free,
           fileName: file.name,
           contentType: file.type || 'application/octet-stream',
           sizeBytes: file.size,
         }),
       );
 
-      const uploadResponse = await fetch(created.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-        },
-        body: file,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('File upload failed before the share could be completed.');
-      }
+      await this.uploadToSignedUrl(created.uploadUrl, file, onProgress);
 
       await firstValueFrom(this.sharesApi.completeFileUpload(created.code));
+      onProgress?.(100);
+
+      const session = this.state().session;
+      const relay = session
+        ? await this.realtimeService.publishFileMetadata(
+            session,
+            file.name,
+            file.type || 'application/octet-stream',
+            file.size,
+            created.code,
+          )
+        : null;
 
       this.appendHistory({
         id: crypto.randomUUID(),
         direction: 'sent',
         kind: 'file-metadata',
-        fileName: file.name,
-        contentType: file.type || 'application/octet-stream',
-        sizeBytes: file.size,
-        createdAtUtc: new Date().toISOString(),
+        fileName: relay?.fileName ?? file.name,
+        contentType: relay?.contentType ?? (file.type || 'application/octet-stream'),
+        sizeBytes: relay?.sizeBytes ?? file.size,
+        createdAtUtc: relay?.publishedAtUtc ?? new Date().toISOString(),
+        sessionCode: session?.code,
         shareCode: created.code,
       });
 
@@ -395,8 +426,10 @@ export class WorkspaceStore {
         },
       }));
       void this.loadQuota();
+      return true;
     } catch (error) {
       this.failSession(error, 'file-share');
+      return false;
     }
   }
 
@@ -468,13 +501,20 @@ export class WorkspaceStore {
         reconnectGraceSeconds: restored.reconnectGraceSeconds,
       });
     } catch (error) {
+      const appError = toAppError(error);
       this.sessionRestoreStorage.clear();
       await this.realtimeService.disconnect();
+
+      if (this.isRecoverableResumeError(appError)) {
+        await this.createOrJoinSession(restored.code);
+        return;
+      }
+
       this.state.update((state) => ({
         ...state,
         session: null,
         sessionStatus: 'error',
-        sessionError: toAppError(error),
+        sessionError: appError,
       }));
     }
   }
@@ -554,6 +594,7 @@ export class WorkspaceStore {
       contentType: message.contentType,
       sizeBytes: message.sizeBytes,
       createdAtUtc: message.publishedAtUtc,
+      shareCode: message.shareCode ?? undefined,
       sessionCode: session.code,
     });
   }
@@ -574,6 +615,40 @@ export class WorkspaceStore {
       ...state,
       history,
     }));
+  }
+
+  private uploadToSignedUrl(
+    uploadUrl: string,
+    file: File,
+    onProgress?: (percent: number) => void,
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open('PUT', uploadUrl, true);
+      request.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+      request.upload.onprogress = (event) => {
+        if (!event.lengthComputable || event.total <= 0) {
+          return;
+        }
+
+        const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
+        onProgress?.(percent);
+      };
+
+      request.onload = () => {
+        if (request.status >= 200 && request.status < 300) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(`File upload failed with status ${request.status}.`));
+      };
+
+      request.onerror = () => reject(new Error('File upload failed before the share could be completed.'));
+      request.onabort = () => reject(new Error('File upload was canceled.'));
+      request.send(file);
+    });
   }
 
   private updateDraft(draft: EditorDraft): void {
@@ -635,5 +710,9 @@ export class WorkspaceStore {
       sessionStatus: busyAction === 'share' || busyAction === 'file-share' ? state.sessionStatus : 'error',
       sessionError: appError,
     }));
+  }
+
+  private isRecoverableResumeError(error: AppError): boolean {
+    return error.code === 'session.reconnect_grace_elapsed';
   }
 }

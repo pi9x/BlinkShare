@@ -2,6 +2,7 @@ using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Features.Shares.ReadText;
 using BlinkShare.Api.Infrastructure.Persistence;
 using BlinkShare.Api.Infrastructure.Security;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlinkShare.Api.UnitTests.Features.Shares.ReadText;
@@ -19,7 +20,6 @@ public sealed class HandlerTests
             new Share(
                 Guid.NewGuid(),
                 "LOCKED01",
-                ShareTier.Free,
                 ShareMode.StoredShare,
                 ShareKind.Text,
                 ShareStatus.Ready,
@@ -58,7 +58,6 @@ public sealed class HandlerTests
             new Share(
                 Guid.NewGuid(),
                 "FILE0001",
-                ShareTier.Free,
                 ShareMode.StoredShare,
                 ShareKind.File,
                 ShareStatus.Ready,
@@ -89,10 +88,21 @@ public sealed class HandlerTests
     private static IDbContextFactory<BlinkShareDbContext> CreateDbContextFactory(string databaseName)
     {
         var options = new DbContextOptionsBuilder<BlinkShareDbContext>()
-            .UseInMemoryDatabase(databaseName)
+            .UseSqlite(CreateOpenConnection(databaseName))
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        return new TestDbContextFactory(options);
+        var factory = new TestDbContextFactory(options);
+        using var dbContext = factory.CreateDbContext();
+        dbContext.Database.EnsureCreated();
+        return factory;
+    }
+
+    private static SqliteConnection CreateOpenConnection(string databaseName)
+    {
+        var connection = new SqliteConnection($"Data Source={databaseName};Mode=Memory;Cache=Shared");
+        connection.Open();
+        return connection;
     }
 
     private static async Task SeedShareAsync(IDbContextFactory<BlinkShareDbContext> dbContextFactory, Share share)

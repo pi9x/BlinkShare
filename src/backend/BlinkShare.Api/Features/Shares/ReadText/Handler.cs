@@ -19,7 +19,6 @@ public sealed class Handler(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var share = await dbContext.Shares
-            .AsNoTracking()
             .Where(candidate => candidate.Code == code)
             .Select(candidate => new ShareReadModel(
                 candidate.Id,
@@ -51,9 +50,7 @@ public sealed class Handler(
             return Result<Response>.Failure(Errors.Share.PasscodeRequired());
         }
 
-        var trackedShare = await dbContext.Shares.SingleAsync(candidate => candidate.Id == share.Id, cancellationToken);
-        trackedShare.MarkAccessed(clock.UtcNow);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await UpdateAccessedAtAsync(dbContext, share.Id, clock.UtcNow, cancellationToken);
 
         return Result<Response>.Success(new Response(
             share.Id,
@@ -69,4 +66,17 @@ public sealed class Handler(
         DateTimeOffset? ExpiresAtUtc,
         bool HasPasscode,
         string? Text);
+
+    private static async Task UpdateAccessedAtAsync(
+        BlinkShareDbContext dbContext,
+        Guid shareId,
+        DateTimeOffset accessedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await dbContext.Shares
+            .Where(candidate => candidate.Id == shareId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(candidate => candidate.LastAccessedAtUtc, accessedAtUtc),
+                cancellationToken);
+    }
 }

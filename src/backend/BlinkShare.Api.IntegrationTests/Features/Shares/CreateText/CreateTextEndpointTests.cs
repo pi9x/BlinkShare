@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using BlinkShare.Api.Features.Shares.CreateText;
@@ -6,6 +7,8 @@ using BlinkShare.Api.Infrastructure.Persistence;
 using BlinkShare.Api.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RegisterRequest = BlinkShare.Api.Features.Auth.Register.Request;
+using RegisterResponse = BlinkShare.Api.Features.Auth.Register.Response;
 
 namespace BlinkShare.Api.IntegrationTests.Features.Shares.CreateText;
 
@@ -16,8 +19,9 @@ public sealed class CreateTextEndpointTests(BlinkShareApiFactory factory) : ICla
     {
         await factory.ResetDatabaseAsync();
         using var client = factory.CreateClient();
+        await AuthenticateAsync(client);
 
-        var response = await client.PostAsJsonAsync("/api/v1/shares/text", new Request(ShareTier.Free, "hello"));
+        var response = await client.PostAsJsonAsync("/api/v1/shares/text", new Request("hello"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
@@ -47,8 +51,9 @@ public sealed class CreateTextEndpointTests(BlinkShareApiFactory factory) : ICla
     {
         await factory.ResetDatabaseAsync();
         using var client = factory.CreateClient();
+        await AuthenticateAsync(client);
 
-        var response = await client.PostAsJsonAsync("/api/v1/shares/text", new Request(ShareTier.Free, " "));
+        var response = await client.PostAsJsonAsync("/api/v1/shares/text", new Request(" "));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -56,5 +61,15 @@ public sealed class CreateTextEndpointTests(BlinkShareApiFactory factory) : ICla
         using var document = await JsonDocument.ParseAsync(contentStream);
 
         Assert.Equal("share.invalid_text", document.RootElement.GetProperty("code").GetString());
+    }
+
+    private static async Task AuthenticateAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/auth/register",
+            new RegisterRequest($"{Guid.NewGuid():N}@example.com", string.Empty));
+        var payload = await response.Content.ReadFromJsonAsync<RegisterResponse>();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload!.SessionToken);
     }
 }

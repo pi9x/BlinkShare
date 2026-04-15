@@ -21,7 +21,6 @@ public sealed class Handler(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var share = await dbContext.Shares
-            .AsNoTracking()
             .Where(candidate => candidate.Code == code)
             .Select(candidate => new ShareDownloadModel(
                 candidate.Id,
@@ -81,15 +80,13 @@ public sealed class Handler(
                 clock.UtcNow.AddMinutes(5)),
             cancellationToken);
 
-        var trackedShare = await dbContext.Shares.SingleAsync(candidate => candidate.Id == share.Id, cancellationToken);
-        trackedShare.RecordDownload(clock.UtcNow);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await IncrementDownloadCountAsync(dbContext, share.Id, clock.UtcNow, cancellationToken);
 
         return Result<Response>.Success(new Response(
-            trackedShare.Id,
-            trackedShare.Code,
+            share.Id,
+            share.Code,
             downloadTarget.DownloadUrl,
-            trackedShare.DownloadCount));
+            share.DownloadCount + 1));
     }
 
     private sealed record ShareDownloadModel(
@@ -104,4 +101,19 @@ public sealed class Handler(
         string? ContentType,
         int DownloadCount,
         int? MaxDownloadCount);
+
+    private static async Task IncrementDownloadCountAsync(
+        BlinkShareDbContext dbContext,
+        Guid shareId,
+        DateTimeOffset accessedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await dbContext.Shares
+            .Where(candidate => candidate.Id == shareId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(candidate => candidate.DownloadCount, candidate => candidate.DownloadCount + 1)
+                    .SetProperty(candidate => candidate.LastAccessedAtUtc, accessedAtUtc),
+                cancellationToken);
+    }
 }

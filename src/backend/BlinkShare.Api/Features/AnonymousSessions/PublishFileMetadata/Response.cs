@@ -6,4 +6,5 @@ public sealed record Response(
     string FileName,
     string ContentType,
     long SizeBytes,
+    string? ShareCode,
     DateTimeOffset PublishedAtUtc);

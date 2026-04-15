@@ -6,6 +6,8 @@ ACCESS_KEY_ID="${GARAGE_ACCESS_KEY_ID:?GARAGE_ACCESS_KEY_ID is required}"
 SECRET_ACCESS_KEY="${GARAGE_SECRET_ACCESS_KEY:?GARAGE_SECRET_ACCESS_KEY is required}"
 BUCKET_NAME="${GARAGE_BUCKET_NAME:?GARAGE_BUCKET_NAME is required}"
 NODE_CAPACITY="${GARAGE_NODE_CAPACITY:-10G}"
+S3_ENDPOINT_URL="${GARAGE_S3_ENDPOINT_URL:-http://object-storage:9000}"
+CORS_ALLOWED_ORIGINS="${GARAGE_CORS_ALLOWED_ORIGINS:-*}"
 
 garage_cmd() {
   /usr/local/bin/garage -c "${CONFIG_FILE}" "$@"
@@ -44,3 +46,52 @@ if ! garage_cmd bucket list | grep -q "[[:space:]]${BUCKET_NAME}[[:space:]]*$"; 
 fi
 
 garage_cmd bucket allow "${BUCKET_NAME}" --read --write --owner --key "${ACCESS_KEY_ID}"
+
+cors_origins_json() {
+  local origins="$1"
+  local output=""
+  local origin
+
+  IFS=',' read -ra origin_list <<< "${origins}"
+  for origin in "${origin_list[@]}"; do
+    origin="${origin#"${origin%%[![:space:]]*}"}"
+    origin="${origin%"${origin##*[![:space:]]}"}"
+    if [[ -z "${origin}" ]]; then
+      continue
+    fi
+
+    if [[ -n "${output}" ]]; then
+      output+=", "
+    fi
+    output+="\"${origin}\""
+  done
+
+  printf '%s' "${output:-\"*\"}"
+}
+
+cat >/tmp/garage-cors.json <<EOF
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": [$(cors_origins_json "${CORS_ALLOWED_ORIGINS}")],
+      "AllowedMethods": ["GET", "HEAD", "PUT"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}
+EOF
+
+AWS_ACCESS_KEY_ID="${ACCESS_KEY_ID}" \
+AWS_SECRET_ACCESS_KEY="${SECRET_ACCESS_KEY}" \
+AWS_DEFAULT_REGION=garage \
+aws configure set default.s3.addressing_style path
+
+AWS_ACCESS_KEY_ID="${ACCESS_KEY_ID}" \
+AWS_SECRET_ACCESS_KEY="${SECRET_ACCESS_KEY}" \
+AWS_DEFAULT_REGION=garage \
+aws --endpoint-url "${S3_ENDPOINT_URL}" \
+  s3api put-bucket-cors \
+  --bucket "${BUCKET_NAME}" \
+  --cors-configuration file:///tmp/garage-cors.json

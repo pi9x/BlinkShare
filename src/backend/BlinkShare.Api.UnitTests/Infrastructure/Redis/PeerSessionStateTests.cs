@@ -13,7 +13,6 @@ public sealed class PeerSessionStateTests
             "TEST1234",
             PeerSessionStatus.Waiting,
             createdAt,
-            createdAt.AddMinutes(5),
             createdAt,
             60,
             []);
@@ -36,7 +35,6 @@ public sealed class PeerSessionStateTests
             "TEST1234",
             PeerSessionStatus.Waiting,
             createdAt,
-            createdAt.AddMinutes(5),
             createdAt,
             60,
             [new PeerState(peerId, "hash", createdAt, createdAt, createdAt.AddSeconds(60))]);
@@ -47,10 +45,11 @@ public sealed class PeerSessionStateTests
         Assert.NotNull(peer);
         Assert.Equal(createdAt.AddSeconds(10), peer!.LastSeenAtUtc);
         Assert.Equal(createdAt.AddSeconds(70), peer.ReconnectGraceEndsAtUtc);
+        Assert.True(peer.IsConnected);
     }
 
     [Fact]
-    public void Mark_peer_disconnected_refreshes_reconnect_grace_without_changing_last_seen()
+    public void Mark_peer_disconnected_refreshes_reconnect_grace_and_decreases_peer_count()
     {
         var createdAt = new DateTimeOffset(2026, 4, 12, 10, 0, 0, TimeSpan.Zero);
         var peerId = Guid.NewGuid();
@@ -59,10 +58,12 @@ public sealed class PeerSessionStateTests
             "TEST1234",
             PeerSessionStatus.Active,
             createdAt,
-            createdAt.AddMinutes(5),
             createdAt,
             60,
-            [new PeerState(peerId, "hash", createdAt, createdAt.AddSeconds(15), createdAt.AddSeconds(60))]);
+            [
+                new PeerState(peerId, "hash", createdAt, createdAt.AddSeconds(15), createdAt.AddSeconds(60)),
+                new PeerState(Guid.NewGuid(), "other", createdAt, createdAt.AddSeconds(20), createdAt.AddSeconds(60))
+            ]);
 
         var updated = session.MarkPeerDisconnected(peerId, createdAt.AddMinutes(2));
         var peer = updated.FindPeer(peerId);
@@ -70,5 +71,7 @@ public sealed class PeerSessionStateTests
         Assert.NotNull(peer);
         Assert.Equal(createdAt.AddSeconds(15), peer!.LastSeenAtUtc);
         Assert.Equal(createdAt.AddMinutes(3), peer.ReconnectGraceEndsAtUtc);
+        Assert.False(peer.IsConnected);
+        Assert.Equal(1, updated.PeerCount);
     }
 }

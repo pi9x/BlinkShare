@@ -24,7 +24,6 @@ public sealed class GetByCodeEndpointTests(BlinkShareApiFactory factory) : IClas
             await dbContext.Shares.AddAsync(new Share(
                 id: shareId,
                 code: "FETCH001",
-                tier: ShareTier.Free,
                 mode: ShareMode.StoredShare,
                 kind: ShareKind.Text,
                 status: ShareStatus.Ready,

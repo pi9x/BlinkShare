@@ -147,7 +147,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
               @if (selectedFileName()) {
                 <p class="text-sm" style="color: var(--muted-label);">{{ selectedFileName() }} · {{ selectedFileMeta() }}</p>
               } @else {
-                <p class="text-sm" style="color: var(--muted-label);">Pick a file, then share or send metadata.</p>
+                <p class="text-sm" style="color: var(--muted-label);">Pick a file, then upload it.</p>
               }
             </div>
 
@@ -160,7 +160,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
                 </svg>
               </button>
               @if (selectedFileName()) {
-                <button class="icon-button icon-button-active" type="button" (click)="relayFileMetadata()" [disabled]="store.busyAction() !== null" aria-label="Send file info" title="Send file info">
+                <button class="icon-button icon-button-active" type="button" (click)="uploadSelectedFile()" [disabled]="store.busyAction() !== null" aria-label="Upload file" title="Upload file">
                   <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                     <path d="M22 2 11 13" />
                     <path d="M22 2 15 22l-4-9-9-4Z" />
@@ -169,6 +169,18 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
               }
             </div>
           </div>
+
+          @if (selectedFileName() && fileUploadProgress() !== null) {
+            <div class="mt-2.5">
+              <div class="mb-1 flex items-center justify-between text-xs font-semibold" style="color: var(--muted-label);">
+                <span>Uploading</span>
+                <span>{{ fileUploadProgress() }}%</span>
+              </div>
+              <div class="h-1.5 overflow-hidden rounded-[0.35rem]" style="background: var(--line-default);">
+                <div class="h-full rounded-[0.35rem] transition-[width] duration-150" style="background: var(--surface-strong);" [style.width.%]="fileUploadProgress() ?? 0"></div>
+              </div>
+            </div>
+          }
 
           <input #fileInput type="file" class="hidden" (change)="onFileChosen($event)" />
         </article>
@@ -204,8 +216,8 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
           </article>
         }
 
-        <article class="surface-card p-3.5">
-          <div class="mb-2.5 flex items-center justify-between gap-2">
+        <article class="surface-card flex max-h-[34rem] min-h-[12rem] flex-col overflow-hidden p-0">
+          <div class="sticky top-0 z-10 flex items-center justify-between gap-2 border-b px-3.5 py-3" style="border-color: var(--line-default); background: var(--surface-default);">
             <p class="text-[1.12rem] font-semibold" style="color: var(--text-strong);">Recent</p>
             <button class="icon-button h-9 w-9" type="button" (click)="store.clearHistory()" aria-label="Clear history" title="Clear history">
               <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
@@ -216,10 +228,12 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
             </button>
           </div>
 
-          <div class="space-y-2.5">
+          <div class="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3.5 py-3 recent-scroll">
             @if (store.history().length) {
-              @for (item of store.history(); track item.id) {
-                <app-clipboard-item-card [item]="item" [copied]="isCopied('history:' + item.id)" (copy)="copyItem(item)" (download)="downloadItem(item)" />
+              @for (item of store.history(); track item.id; let i = $index) {
+                <div class="pt-2.5" [class.pt-0]="i === 0" [style.border-top]="i === 0 ? 'none' : '1px solid var(--line-default)'">
+                  <app-clipboard-item-card [item]="item" [copied]="isCopied('history:' + item.id)" (copy)="copyItem(item)" (download)="downloadItem(item)" />
+                </div>
               }
             } @else {
               <app-empty-state eyebrow="Empty" title="Nothing yet" copy="Sent and received items show up here." />
@@ -289,6 +303,7 @@ export class WorkspacePageComponent {
   protected readonly copiedKey = signal<string | null>(null);
   protected readonly snackbarMessage = signal<string | null>(null);
   protected readonly selectedFile = signal<File | null>(null);
+  protected readonly fileUploadProgress = signal<number | null>(null);
   protected readonly languages = EDITOR_LANGUAGES;
 
   private copiedHandle: ReturnType<typeof setTimeout> | null = null;
@@ -330,6 +345,7 @@ export class WorkspacePageComponent {
   protected onFileChosen(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.selectedFile.set(input.files?.[0] ?? null);
+    this.fileUploadProgress.set(null);
   }
 
   protected selectedFileName(): string {
@@ -345,14 +361,22 @@ export class WorkspacePageComponent {
     return `${file.type || 'application/octet-stream'} · ${formatBytes(file.size)}`;
   }
 
-  protected async relayFileMetadata(): Promise<void> {
+  protected async uploadSelectedFile(): Promise<void> {
     const file = this.selectedFile();
     if (!file) {
       return;
     }
 
-    await this.store.publishFileMetadata(file);
-    this.resetSelectedFile();
+    this.fileUploadProgress.set(0);
+    const uploaded = await this.store.createFileShare(file, (percent) => {
+      this.fileUploadProgress.set(percent);
+    });
+
+    if (uploaded) {
+      this.resetSelectedFile();
+    }
+
+    this.fileUploadProgress.set(null);
   }
 
   protected isCopied(key: string): boolean {
@@ -459,6 +483,7 @@ export class WorkspacePageComponent {
 
   private resetSelectedFile(): void {
     this.selectedFile.set(null);
+    this.fileUploadProgress.set(null);
 
     const input = this.fileInput?.nativeElement;
     if (input) {

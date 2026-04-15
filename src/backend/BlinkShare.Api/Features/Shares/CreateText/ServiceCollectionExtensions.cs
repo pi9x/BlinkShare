@@ -17,9 +17,6 @@ public static class ServiceCollectionExtensions
             .Validate(options => options.FreeTierTtlMinutes > 0, "FreeTierTtlMinutes must be greater than zero.")
             .ValidateOnStart();
 
-        services.AddTransient<Validator>();
-        services.AddTransient<Handler>();
-
         return services;
     }
 }

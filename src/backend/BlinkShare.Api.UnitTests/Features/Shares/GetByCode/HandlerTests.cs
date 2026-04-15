@@ -29,7 +29,6 @@ public sealed class HandlerTests
             new Share(
                 id: Guid.NewGuid(),
                 code: "EXPIRED1",
-                tier: ShareTier.Free,
                 mode: ShareMode.StoredShare,
                 kind: ShareKind.Text,
                 status: ShareStatus.Ready,
@@ -68,7 +67,6 @@ public sealed class HandlerTests
             new Share(
                 id: shareId,
                 code: "PUBLIC01",
-                tier: ShareTier.Free,
                 mode: ShareMode.StoredShare,
                 kind: ShareKind.Text,
                 status: ShareStatus.Ready,

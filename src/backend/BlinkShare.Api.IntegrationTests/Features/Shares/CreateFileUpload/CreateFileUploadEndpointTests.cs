@@ -18,7 +18,7 @@ public sealed class CreateFileUploadEndpointTests(BlinkShareApiFactory factory) 
 
         var response = await client.PostAsJsonAsync(
             "/api/v1/shares/file",
-            new Request(ShareTier.Free, "report.txt", "text/plain", 12));
+            new Request("report.txt", "text/plain", 12));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
@@ -36,5 +36,18 @@ public sealed class CreateFileUploadEndpointTests(BlinkShareApiFactory factory) 
         Assert.Equal(ShareKind.File, share.Kind);
         Assert.Equal(ShareStatus.Pending, share.Status);
         Assert.Equal("report.txt", share.FileName);
+    }
+
+    [RequiresDockerFact]
+    public async Task Post_rejects_anonymous_file_larger_than_limit()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/shares/file",
+            new Request("large.bin", "application/octet-stream", (512 * 1024) + 1));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

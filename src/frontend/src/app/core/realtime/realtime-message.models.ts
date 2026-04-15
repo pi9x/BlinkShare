@@ -38,6 +38,7 @@ export interface ContentFileMetadataReceivedMessage {
   fileName: string;
   contentType: string;
   sizeBytes: number;
+  shareCode?: string | null;
   publishedAtUtc: string;
 }
 

@@ -93,6 +93,7 @@ public sealed class S3CompatibleObjectStorage : IObjectStorage, IDisposable
         var config = new AmazonS3Config
         {
             ServiceURL = serviceUrl,
+            AuthenticationRegion = _options.Region,
             ForcePathStyle = _options.ForcePathStyle
         };
 

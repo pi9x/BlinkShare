@@ -14,7 +14,6 @@ public sealed class Handler(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var response = await dbContext.Shares
-            .AsNoTracking()
             .Where(share => share.Code == code)
             .Select(share => new Response(
                 share.Id,

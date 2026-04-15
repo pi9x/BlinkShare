@@ -1,3 +1,4 @@
+using BlinkShare.Api.Common.Auth;
 using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Features.Shares.CreateText;
 using BlinkShare.Api.Infrastructure.Persistence;
@@ -16,7 +17,7 @@ public sealed class HandlerTests
         var dbContextFactory = CreateDbContextFactory(databaseName);
         var clock = new FakeClock(new DateTimeOffset(2026, 4, 12, 10, 30, 0, TimeSpan.Zero));
         var handler = CreateHandler(dbContextFactory, clock, new FixedCodeGenerator("TEXT1234"), maxTextLength: 1000);
-        var command = new Command(ShareTier.Free, "hello");
+        var command = new Command(AccountTier.Free, "hello");
 
         var result = await handler.HandleAsync(command, CancellationToken.None);
 
@@ -29,7 +30,6 @@ public sealed class HandlerTests
         var share = await dbContext.Shares.AsNoTracking().SingleAsync();
 
         Assert.Equal(result.Value.ShareId, share.Id);
-        Assert.Equal(ShareTier.Free, share.Tier);
         Assert.Equal(ShareMode.StoredShare, share.Mode);
         Assert.Equal(ShareKind.Text, share.Kind);
         Assert.Equal(ShareStatus.Ready, share.Status);
@@ -42,7 +42,7 @@ public sealed class HandlerTests
     {
         var handler = CreateHandler(CreateDbContextFactory(Guid.NewGuid().ToString("N")));
 
-        var result = await handler.HandleAsync(new Command(ShareTier.Free, "   "), CancellationToken.None);
+        var result = await handler.HandleAsync(new Command(AccountTier.Free, "   "), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("share.invalid_text", result.Error!.Code);
@@ -53,7 +53,7 @@ public sealed class HandlerTests
     {
         var handler = CreateHandler(CreateDbContextFactory(Guid.NewGuid().ToString("N")));
 
-        var result = await handler.HandleAsync(new Command(ShareTier.Free, null), CancellationToken.None);
+        var result = await handler.HandleAsync(new Command(AccountTier.Free, null), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("general.validation", result.Error!.Code);
@@ -64,7 +64,7 @@ public sealed class HandlerTests
     {
         var handler = CreateHandler(CreateDbContextFactory(Guid.NewGuid().ToString("N")), maxTextLength: 3);
 
-        var result = await handler.HandleAsync(new Command(ShareTier.Free, "toolong"), CancellationToken.None);
+        var result = await handler.HandleAsync(new Command(AccountTier.Free, "toolong"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("share.text_too_large", result.Error!.Code);
@@ -73,9 +73,9 @@ public sealed class HandlerTests
     [Fact]
     public async Task Anonymous_tier_fails()
     {
-        var handler = CreateHandler(CreateDbContextFactory(Guid.NewGuid().ToString("N")));
+        var handler = CreateHandler(CreateDbContextFactory(Guid.NewGuid().ToString("N")), accountTier: null);
 
-        var result = await handler.HandleAsync(new Command(ShareTier.Anonymous, "hello"), CancellationToken.None);
+        var result = await handler.HandleAsync(new Command(AccountTier.Anonymous, "hello"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("share.anonymous_relay_not_supported", result.Error!.Code);
@@ -92,7 +92,6 @@ public sealed class HandlerTests
             await seedContext.Shares.AddAsync(new Share(
                 id: Guid.NewGuid(),
                 code: "DUPLICATE",
-                tier: ShareTier.Free,
                 mode: ShareMode.StoredShare,
                 kind: ShareKind.Text,
                 status: ShareStatus.Ready,
@@ -115,7 +114,7 @@ public sealed class HandlerTests
             dbContextFactory,
             codeGenerator: new SequenceCodeGenerator("DUPLICATE", "UNIQUE123"));
 
-        var result = await handler.HandleAsync(new Command(ShareTier.Free, "hello"), CancellationToken.None);
+        var result = await handler.HandleAsync(new Command(AccountTier.Free, "hello"), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("UNIQUE123", result.Value!.Code);
@@ -125,6 +124,7 @@ public sealed class HandlerTests
         IDbContextFactory<BlinkShareDbContext> dbContextFactory,
         IClock? clock = null,
         ICodeGenerator? codeGenerator = null,
+        AccountTier? accountTier = AccountTier.Free,
         int maxTextLength = 10_000)
     {
         var options = Options.Create(new CreateTextOptions
@@ -137,6 +137,7 @@ public sealed class HandlerTests
             dbContextFactory,
             new Validator(options),
             codeGenerator ?? new FixedCodeGenerator("TEXT1234"),
+            new FakeCurrentAccountAccessor(accountTier),
             clock ?? new FakeClock(new DateTimeOffset(2026, 4, 12, 10, 30, 0, TimeSpan.Zero)),
             options);
     }
@@ -162,6 +163,12 @@ public sealed class HandlerTests
     private sealed class FakeClock(DateTimeOffset utcNow) : IClock
     {
         public DateTimeOffset UtcNow { get; } = utcNow;
+    }
+
+    private sealed class FakeCurrentAccountAccessor(AccountTier? tier) : ICurrentAccountAccessor
+    {
+        public CurrentAccount? GetCurrentAccount() =>
+            tier is null ? null : new CurrentAccount(Guid.NewGuid(), "tester@example.com", tier.Value);
     }
 
     private sealed class FixedCodeGenerator(string code) : ICodeGenerator

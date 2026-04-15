@@ -34,7 +34,6 @@ public sealed class HandlerTests
                 "TEST1234",
                 PeerSessionStatus.Waiting,
                 createdAt,
-                createdAt.AddMinutes(5),
                 createdAt,
                 60,
                 [new PeerState(Guid.NewGuid(), "hash", createdAt, createdAt, createdAt.AddSeconds(60))]),
@@ -56,7 +55,6 @@ public sealed class HandlerTests
             new FixedCodeGenerator("TEST1234"),
             Options.Create(new AnonymousSessionOptions
             {
-                SessionLifetimeMinutes = 5,
                 ReconnectGraceSeconds = 60
             }));
 

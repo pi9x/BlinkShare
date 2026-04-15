@@ -35,9 +35,12 @@ public sealed class Handler(
             return Result<Response>.Failure(Errors.Share.InvalidStatus("Only pending file shares can transition to ready."));
         }
 
-        share.MarkReady();
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.Shares
+            .Where(candidate => candidate.Id == share.Id)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(candidate => candidate.Status, ShareStatus.Ready),
+                cancellationToken);
 
-        return Result<Response>.Success(new Response(share.Id, share.Code, share.Status));
+        return Result<Response>.Success(new Response(share.Id, share.Code, ShareStatus.Ready));
     }
 }

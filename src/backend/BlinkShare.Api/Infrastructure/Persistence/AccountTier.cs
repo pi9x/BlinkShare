@@ -1,6 +1,6 @@
 namespace BlinkShare.Api.Infrastructure.Persistence;
 
-public enum ShareTier
+public enum AccountTier
 {
     Anonymous = 1,
     Free = 2,

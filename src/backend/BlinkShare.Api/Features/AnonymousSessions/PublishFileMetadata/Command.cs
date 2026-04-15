@@ -6,4 +6,5 @@ public sealed record Command(
     string? ResumeToken,
     string? FileName,
     string? ContentType,
-    long SizeBytes);
+    long SizeBytes,
+    string? ShareCode);

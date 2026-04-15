@@ -20,12 +20,6 @@ public sealed class ShareConfiguration : IEntityTypeConfiguration<Share>
             .HasMaxLength(32)
             .IsRequired();
 
-        builder.Property(share => share.Tier)
-            .HasColumnName("tier")
-            .HasConversion<string>()
-            .HasMaxLength(16)
-            .IsRequired();
-
         builder.Property(share => share.Mode)
             .HasColumnName("mode")
             .HasConversion<string>()

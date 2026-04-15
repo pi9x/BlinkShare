@@ -66,16 +66,10 @@ public sealed class RedisPeerSessionStore(IConnectionMultiplexer connectionMulti
 
     private async Task SaveInternalAsync(PeerSessionState session)
     {
-        var ttl = session.ExpiresAtUtc - DateTimeOffset.UtcNow;
-        if (ttl <= TimeSpan.Zero)
-        {
-            ttl = TimeSpan.FromSeconds(1);
-        }
-
         var serialized = JsonSerializer.Serialize(session, SerializerOptions);
         var batch = _database.CreateBatch();
-        var saveSessionTask = batch.StringSetAsync(GetSessionKey(session.SessionId), serialized, ttl);
-        var saveCodeTask = batch.StringSetAsync(GetCodeKey(session.Code), session.SessionId.ToString("D"), ttl);
+        var saveSessionTask = batch.StringSetAsync(GetSessionKey(session.SessionId), serialized);
+        var saveCodeTask = batch.StringSetAsync(GetCodeKey(session.Code), session.SessionId.ToString("D"));
         batch.Execute();
         await Task.WhenAll(saveSessionTask, saveCodeTask);
     }

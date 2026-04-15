@@ -11,6 +11,7 @@ public sealed class Account
         string email,
         string normalizedEmail,
         string passwordHash,
+        AccountTier tier,
         DateTimeOffset createdAtUtc,
         DateTimeOffset? lastLoginAtUtc)
     {
@@ -18,6 +19,7 @@ public sealed class Account
         Email = email;
         NormalizedEmail = normalizedEmail;
         PasswordHash = passwordHash;
+        Tier = tier;
         CreatedAtUtc = createdAtUtc;
         LastLoginAtUtc = lastLoginAtUtc;
     }
@@ -30,12 +32,9 @@ public sealed class Account
 
     public string PasswordHash { get; private set; } = string.Empty;
 
+    public AccountTier Tier { get; private set; } = AccountTier.Free;
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public DateTimeOffset? LastLoginAtUtc { get; private set; }
-
-    public void MarkLoggedIn(DateTimeOffset loggedInAtUtc)
-    {
-        LastLoginAtUtc = loggedInAtUtc;
-    }
 }

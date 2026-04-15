@@ -26,11 +26,6 @@ public sealed class PeerSessionAccessService(
             return Result<AuthorizedPeerSession>.Failure(Errors.Session.NotFound());
         }
 
-        if (session.IsExpired(clock.UtcNow))
-        {
-            return Result<AuthorizedPeerSession>.Failure(Errors.Session.Expired());
-        }
-
         var peer = session.FindPeer(peerId);
         if (peer is null)
         {
@@ -60,7 +55,7 @@ public sealed class PeerSessionAccessService(
         return updatedSession;
     }
 
-    public async Task MarkDisconnectedAsync(
+    public async Task<PeerSessionState?> MarkDisconnectedAsync(
         Guid sessionId,
         Guid peerId,
         CancellationToken cancellationToken)
@@ -68,16 +63,17 @@ public sealed class PeerSessionAccessService(
         var session = await peerSessionStore.GetBySessionIdAsync(sessionId, cancellationToken);
         if (session is null)
         {
-            return;
+            return null;
         }
 
         if (session.FindPeer(peerId) is null)
         {
-            return;
+            return null;
         }
 
         var updatedSession = session.MarkPeerDisconnected(peerId, clock.UtcNow);
         await peerSessionStore.SaveAsync(updatedSession, cancellationToken);
+        return updatedSession;
     }
 }
 

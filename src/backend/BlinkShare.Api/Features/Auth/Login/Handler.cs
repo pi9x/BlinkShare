@@ -45,7 +45,6 @@ public sealed class Handler(
         }
 
         var now = clock.UtcNow;
-        account.MarkLoggedIn(now);
 
         var sessionToken = authSessionTokenFactory.CreateToken();
         var sessionExpiresAtUtc = now.AddHours(options.Value.SessionLifetimeHours);
@@ -59,12 +58,27 @@ public sealed class Handler(
             null);
 
         await dbContext.AuthSessions.AddAsync(authSession, cancellationToken);
+        await UpdateLastLoginAsync(dbContext, account, now, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<Response>.Success(new Response(
             account.Id,
             account.Email,
+            account.Tier,
             sessionToken,
             sessionExpiresAtUtc));
+    }
+
+    private static async Task UpdateLastLoginAsync(
+        BlinkShareDbContext dbContext,
+        Account account,
+        DateTimeOffset loggedInAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await dbContext.Accounts
+            .Where(candidate => candidate.Id == account.Id)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(candidate => candidate.LastLoginAtUtc, loggedInAtUtc),
+                cancellationToken);
     }
 }

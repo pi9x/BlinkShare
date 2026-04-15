@@ -5,7 +5,8 @@ public sealed record Request(
     string? ResumeToken,
     string? FileName,
     string? ContentType,
-    long SizeBytes)
+    long SizeBytes,
+    string? ShareCode = null)
 {
-    public Command ToCommand(Guid sessionId) => new(sessionId, PeerId, ResumeToken, FileName, ContentType, SizeBytes);
+    public Command ToCommand(Guid sessionId) => new(sessionId, PeerId, ResumeToken, FileName, ContentType, SizeBytes, ShareCode);
 }

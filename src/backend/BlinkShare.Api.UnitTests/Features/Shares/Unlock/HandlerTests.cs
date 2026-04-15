@@ -21,7 +21,6 @@ public sealed class HandlerTests
             new Share(
                 Guid.NewGuid(),
                 "LOCK1234",
-                ShareTier.Free,
                 ShareMode.StoredShare,
                 ShareKind.Text,
                 ShareStatus.Ready,
@@ -58,7 +57,6 @@ public sealed class HandlerTests
             new Share(
                 Guid.NewGuid(),
                 "LOCK1234",
-                ShareTier.Free,
                 ShareMode.StoredShare,
                 ShareKind.Text,
                 ShareStatus.Ready,

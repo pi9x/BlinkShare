@@ -20,7 +20,6 @@ public sealed class ReadTextEndpointTests(BlinkShareApiFactory factory) : IClass
         await SeedShareAsync(new Share(
             shareId,
             "READ0001",
-            ShareTier.Free,
             ShareMode.StoredShare,
             ShareKind.Text,
             ShareStatus.Ready,
@@ -57,7 +56,6 @@ public sealed class ReadTextEndpointTests(BlinkShareApiFactory factory) : IClass
         await SeedShareAsync(new Share(
             Guid.NewGuid(),
             "READ0001",
-            ShareTier.Free,
             ShareMode.StoredShare,
             ShareKind.Text,
             ShareStatus.Ready,
@@ -89,7 +87,6 @@ public sealed class ReadTextEndpointTests(BlinkShareApiFactory factory) : IClass
         await SeedShareAsync(new Share(
             Guid.NewGuid(),
             "READ0001",
-            ShareTier.Free,
             ShareMode.StoredShare,
             ShareKind.Text,
             ShareStatus.Ready,

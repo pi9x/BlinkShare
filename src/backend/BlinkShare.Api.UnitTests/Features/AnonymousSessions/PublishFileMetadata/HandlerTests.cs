@@ -13,7 +13,7 @@ public sealed class HandlerTests
     {
         var handler = CreateHandler(new TestPeerSessionStore(null));
 
-        var result = await handler.HandleAsync(new Command(Guid.NewGuid(), Guid.NewGuid(), "token", null, "text/plain", 1), CancellationToken.None);
+        var result = await handler.HandleAsync(new Command(Guid.NewGuid(), Guid.NewGuid(), "token", null, "text/plain", 1, null), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("general.validation", result.Error!.Code);
@@ -24,7 +24,7 @@ public sealed class HandlerTests
     {
         var handler = CreateHandler(new TestPeerSessionStore(null));
 
-        var result = await handler.HandleAsync(new Command(Guid.NewGuid(), Guid.NewGuid(), "token", "file.txt", "text/plain", 1), CancellationToken.None);
+        var result = await handler.HandleAsync(new Command(Guid.NewGuid(), Guid.NewGuid(), "token", "file.txt", "text/plain", 1, null), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("session.not_found", result.Error!.Code);

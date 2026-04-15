@@ -70,9 +70,6 @@ public static class Errors
         public static Error NotFound(string? message = null) =>
             new("session.not_found", message ?? "Peer session was not found.");
 
-        public static Error Expired(string? message = null) =>
-            new("session.expired", message ?? "Peer session has expired.");
-
         public static Error InvalidCode(string? message = null) =>
             new("session.invalid_code", message ?? "The supplied peer session code is invalid.");
 

@@ -30,6 +30,12 @@ public sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasMaxLength(256)
             .IsRequired();
 
+        builder.Property(account => account.Tier)
+            .HasColumnName("tier")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired();
+
         builder.Property(account => account.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();

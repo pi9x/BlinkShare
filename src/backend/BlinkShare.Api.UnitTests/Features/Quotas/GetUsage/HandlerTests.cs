@@ -13,7 +13,7 @@ public sealed class HandlerTests
     public async Task Returns_free_tier_usage_for_authenticated_account()
     {
         var handler = new Handler(
-            new FakeCurrentAccountAccessor(new CurrentAccount(Guid.NewGuid(), "demo@example.com")),
+            new FakeCurrentAccountAccessor(new CurrentAccount(Guid.NewGuid(), "demo@example.com", AccountTier.Free)),
             new FakeClock(new DateTimeOffset(2026, 4, 12, 10, 30, 0, TimeSpan.Zero)),
             Options.Create(new QuotaOptions
             {
@@ -26,7 +26,7 @@ public sealed class HandlerTests
         var result = await handler.HandleAsync(CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(ShareTier.Free, result.Value!.Tier);
+        Assert.Equal(AccountTier.Free, result.Value!.Tier);
         Assert.Equal(456, result.Value.BytesLimitToday);
         Assert.Equal(new DateTimeOffset(2026, 4, 13, 0, 0, 0, TimeSpan.Zero), result.Value.WindowEndsAtUtc);
     }
@@ -48,7 +48,7 @@ public sealed class HandlerTests
         var result = await handler.HandleAsync(CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(ShareTier.Anonymous, result.Value!.Tier);
+        Assert.Equal(AccountTier.Anonymous, result.Value!.Tier);
         Assert.Equal(123, result.Value.BytesLimitToday);
     }
 

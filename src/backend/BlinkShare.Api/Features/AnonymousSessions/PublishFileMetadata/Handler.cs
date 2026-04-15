@@ -32,6 +32,10 @@ public sealed class Handler(
             command.FileName!,
             command.ContentType!,
             command.SizeBytes,
+            NormalizeShareCode(command.ShareCode),
             updatedSession.LastActivityAtUtc));
     }
+
+    private static string? NormalizeShareCode(string? shareCode) =>
+        string.IsNullOrWhiteSpace(shareCode) ? null : shareCode.Trim().ToUpperInvariant();
 }

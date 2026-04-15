@@ -22,6 +22,7 @@ public sealed class HandlerTests
                 "demo@example.com",
                 BlinkShare.Api.Features.Auth.Register.Handler.NormalizeEmail("demo@example.com"),
                 new Pbkdf2AccountPasswordHasher().Hash(""),
+                AccountTier.Free,
                 new DateTimeOffset(2026, 4, 12, 10, 0, 0, TimeSpan.Zero),
                 null));
             await dbContext.SaveChangesAsync();

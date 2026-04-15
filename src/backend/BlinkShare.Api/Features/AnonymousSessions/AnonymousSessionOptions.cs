@@ -2,8 +2,6 @@ namespace BlinkShare.Api.Features.AnonymousSessions;
 
 public sealed class AnonymousSessionOptions
 {
-    public int SessionLifetimeMinutes { get; set; } = 5;
-
     public int ReconnectGraceSeconds { get; set; } = 60;
 
     public int MaxTextLength { get; set; } = 10_000;

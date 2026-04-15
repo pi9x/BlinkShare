@@ -8,12 +8,12 @@ public sealed class Validator(IOptions<CreateTextOptions> options) : BlinkShare.
 {
     public Result Validate(Command command)
     {
-        if (command.Tier == ShareTier.Anonymous)
+        if (command.Tier == AccountTier.Anonymous)
         {
             return Result.Failure(Errors.Share.AnonymousRelayNotSupported());
         }
 
-        if (command.Tier != ShareTier.Free)
+        if (command.Tier != AccountTier.Free)
         {
             return Result.Failure(Errors.Share.UnsupportedTier("Only the free tier is currently handled by this slice."));
         }

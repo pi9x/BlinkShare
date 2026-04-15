@@ -70,6 +70,7 @@ export class AnonymousSessionRealtimeService {
     fileName: string,
     contentType: string,
     sizeBytes: number,
+    shareCode?: string | null,
   ): Promise<PublishAnonymousFileMetadataResponse> {
     await this.connect(session);
 
@@ -81,6 +82,7 @@ export class AnonymousSessionRealtimeService {
       fileName,
       contentType,
       sizeBytes,
+      shareCode ?? null,
     );
   }
 

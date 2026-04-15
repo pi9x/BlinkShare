@@ -2,7 +2,7 @@ FROM dxflrs/garage:v2.2.0 AS garage
 
 FROM alpine:3.20
 
-RUN apk add --no-cache bash grep
+RUN apk add --no-cache aws-cli bash grep
 
 COPY --from=garage /garage /usr/local/bin/garage
 COPY tools/garage-bootstrap/bootstrap.sh /usr/local/bin/bootstrap-garage

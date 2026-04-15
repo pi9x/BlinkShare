@@ -15,7 +15,7 @@ WORKDIR /src/src/backend/BlinkShare.Worker
 RUN dotnet build BlinkShare.Worker.csproj -c Release --no-restore
 RUN dotnet publish BlinkShare.Worker.csproj -c Release -o /app/publish --no-build
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 COPY --from=build /app/publish ./

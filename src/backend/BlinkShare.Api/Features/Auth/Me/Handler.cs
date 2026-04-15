@@ -20,9 +20,8 @@ public sealed class Handler(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var response = await dbContext.Accounts
-            .AsNoTracking()
             .Where(account => account.Id == currentAccount.AccountId)
-            .Select(account => new Response(account.Id, account.Email, account.CreatedAtUtc))
+            .Select(account => new Response(account.Id, account.Email, account.Tier, account.CreatedAtUtc))
             .SingleOrDefaultAsync(cancellationToken);
 
         return response is null

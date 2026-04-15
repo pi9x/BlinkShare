@@ -68,11 +68,12 @@ public sealed class AnonymousSessionHub(
         string? resumeToken,
         string? fileName,
         string? contentType,
-        long sizeBytes)
+        long sizeBytes,
+        string? shareCode = null)
     {
         var cancellationToken = Context.ConnectionAborted;
         var validationResult = publishFileMetadataValidator.Validate(
-            new PublishFileMetadata.Command(sessionId, peerId, resumeToken, fileName, contentType, sizeBytes));
+            new PublishFileMetadata.Command(sessionId, peerId, resumeToken, fileName, contentType, sizeBytes, shareCode));
         if (validationResult.IsFailure)
         {
             throw CreateHubException(validationResult.Error!);
@@ -91,6 +92,7 @@ public sealed class AnonymousSessionHub(
             fileName!,
             contentType!,
             sizeBytes,
+            NormalizeShareCode(shareCode),
             updatedSession.LastActivityAtUtc);
 
         await Clients.Group(GetGroupName(sessionId)).SendAsync("contentFileMetadataReceived", message, cancellationToken);
@@ -102,13 +104,23 @@ public sealed class AnonymousSessionHub(
     {
         if (TryGetConnectionSession(out var sessionId, out var peerId))
         {
-            await accessService.MarkDisconnectedAsync(sessionId, peerId, CancellationToken.None);
+            var updatedSession = await accessService.MarkDisconnectedAsync(sessionId, peerId, CancellationToken.None);
+            if (updatedSession is not null)
+            {
+                await Clients.Group(GetGroupName(sessionId)).SendAsync(
+                    "peerConnected",
+                    new PeerConnectedMessage(updatedSession.SessionId, peerId, updatedSession.PeerCount),
+                    CancellationToken.None);
+            }
         }
 
         await base.OnDisconnectedAsync(exception);
     }
 
     private static string GetGroupName(Guid sessionId) => $"anonymous-session:{sessionId:D}";
+
+    private static string? NormalizeShareCode(string? shareCode) =>
+        string.IsNullOrWhiteSpace(shareCode) ? null : shareCode.Trim().ToUpperInvariant();
 
     private static HubException CreateHubException(Error error) =>
         new($"{error.Code}|{error.Message}");

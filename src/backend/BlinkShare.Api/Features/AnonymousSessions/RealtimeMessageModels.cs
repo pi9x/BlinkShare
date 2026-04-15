@@ -17,4 +17,5 @@ public sealed record FileMetadataPublishedMessage(
     string FileName,
     string ContentType,
     long SizeBytes,
+    string? ShareCode,
     DateTimeOffset PublishedAtUtc);

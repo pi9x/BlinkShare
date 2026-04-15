@@ -3,6 +3,7 @@ using BlinkShare.Api.Features.Auth.Login;
 using BlinkShare.Api.Infrastructure.Auth;
 using BlinkShare.Api.Infrastructure.Persistence;
 using BlinkShare.Api.Infrastructure.Security;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -23,6 +24,7 @@ public sealed class HandlerTests
                 "demo@example.com",
                 BlinkShare.Api.Features.Auth.Register.Handler.NormalizeEmail("demo@example.com"),
                 passwordHasher.Hash("secret"),
+                AccountTier.Free,
                 new DateTimeOffset(2026, 4, 12, 10, 0, 0, TimeSpan.Zero),
                 null));
             await dbContext.SaveChangesAsync();
@@ -49,6 +51,7 @@ public sealed class HandlerTests
                 "demo@example.com",
                 BlinkShare.Api.Features.Auth.Register.Handler.NormalizeEmail("demo@example.com"),
                 passwordHasher.Hash(string.Empty),
+                AccountTier.Free,
                 new DateTimeOffset(2026, 4, 12, 10, 0, 0, TimeSpan.Zero),
                 null));
             await dbContext.SaveChangesAsync();
@@ -76,10 +79,21 @@ public sealed class HandlerTests
     private static IDbContextFactory<BlinkShareDbContext> CreateDbContextFactory(string databaseName)
     {
         var options = new DbContextOptionsBuilder<BlinkShareDbContext>()
-            .UseInMemoryDatabase(databaseName)
+            .UseSqlite(CreateOpenConnection(databaseName))
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        return new TestDbContextFactory(options);
+        var factory = new TestDbContextFactory(options);
+        using var dbContext = factory.CreateDbContext();
+        dbContext.Database.EnsureCreated();
+        return factory;
+    }
+
+    private static SqliteConnection CreateOpenConnection(string databaseName)
+    {
+        var connection = new SqliteConnection($"Data Source={databaseName};Mode=Memory;Cache=Shared");
+        connection.Open();
+        return connection;
     }
 
     private sealed class TestDbContextFactory(DbContextOptions<BlinkShareDbContext> options)

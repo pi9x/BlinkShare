@@ -1,12 +1,55 @@
 using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Features.Shares.CompleteFileUpload;
 using BlinkShare.Api.Infrastructure.Persistence;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlinkShare.Api.UnitTests.Features.Shares.CompleteFileUpload;
 
 public sealed class HandlerTests
 {
+    [Fact]
+    public async Task Pending_file_share_is_marked_ready()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var dbContextFactory = CreateDbContextFactory(databaseName);
+
+        await SeedShareAsync(
+            dbContextFactory,
+            new Share(
+                Guid.NewGuid(),
+                "FILE1234",
+                ShareMode.StoredShare,
+                ShareKind.File,
+                ShareStatus.Pending,
+                null,
+                null,
+                null,
+                "report.txt",
+                "text/plain",
+                12,
+                "shares/FILE1234/report.txt",
+                new DateTimeOffset(2026, 4, 12, 10, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 4, 12, 10, 35, 0, TimeSpan.Zero),
+                null,
+                0,
+                null));
+
+        var handler = new Handler(dbContextFactory, new FakeClock(new DateTimeOffset(2026, 4, 12, 10, 30, 0, TimeSpan.Zero)));
+
+        var result = await handler.HandleAsync("FILE1234", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ShareStatus.Ready, result.Value!.Status);
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var persistedShare = await dbContext.Shares
+            .AsNoTracking()
+            .SingleAsync(share => share.Code == "FILE1234");
+
+        Assert.Equal(ShareStatus.Ready, persistedShare.Status);
+    }
+
     [Fact]
     public async Task Non_pending_share_returns_invalid_status()
     {
@@ -18,7 +61,6 @@ public sealed class HandlerTests
             new Share(
                 Guid.NewGuid(),
                 "FILE1234",
-                ShareTier.Free,
                 ShareMode.StoredShare,
                 ShareKind.File,
                 ShareStatus.Ready,
@@ -46,10 +88,21 @@ public sealed class HandlerTests
     private static IDbContextFactory<BlinkShareDbContext> CreateDbContextFactory(string databaseName)
     {
         var options = new DbContextOptionsBuilder<BlinkShareDbContext>()
-            .UseInMemoryDatabase(databaseName)
+            .UseSqlite(CreateOpenConnection(databaseName))
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        return new TestDbContextFactory(options);
+        var factory = new TestDbContextFactory(options);
+        using var dbContext = factory.CreateDbContext();
+        dbContext.Database.EnsureCreated();
+        return factory;
+    }
+
+    private static SqliteConnection CreateOpenConnection(string databaseName)
+    {
+        var connection = new SqliteConnection($"Data Source={databaseName};Mode=Memory;Cache=Shared");
+        connection.Open();
+        return connection;
     }
 
     private static async Task SeedShareAsync(IDbContextFactory<BlinkShareDbContext> dbContextFactory, Share share)

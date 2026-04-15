@@ -32,7 +32,8 @@ public sealed class BlinkShareApiFactory : WebApplicationFactory<Program>, IAsyn
                 ["ConnectionStrings:Redis"] = "localhost:6379,abortConnect=false",
                 ["Shares:CreateText:MaxTextLength"] = "1000",
                 ["Shares:CreateText:FreeTierTtlMinutes"] = "5",
-                ["Shares:CreateFileUpload:MaxFileSizeBytes"] = "2048",
+                ["Shares:CreateFileUpload:AnonymousMaxFileSizeBytes"] = "524288",
+                ["Shares:CreateFileUpload:FreeMaxFileSizeBytes"] = "1048576",
                 ["Shares:CreateFileUpload:FreeTierTtlMinutes"] = "5",
                 ["Shares:Unlock:LifetimeMinutes"] = "5"
             });

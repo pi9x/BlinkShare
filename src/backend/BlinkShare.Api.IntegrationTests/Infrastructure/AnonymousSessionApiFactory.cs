@@ -21,7 +21,6 @@ public sealed class AnonymousSessionApiFactory : WebApplicationFactory<Program>
         {
             configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["AnonymousSessions:SessionLifetimeMinutes"] = "5",
                 ["AnonymousSessions:ReconnectGraceSeconds"] = "60",
                 ["AnonymousSessions:MaxTextLength"] = "1000",
                 ["AnonymousSessions:MaxFileSizeBytes"] = "2048"

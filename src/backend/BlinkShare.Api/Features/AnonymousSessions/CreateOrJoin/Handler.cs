@@ -59,7 +59,6 @@ public sealed class Handler(
                 code,
                 PeerSessionStatus.Waiting,
                 now,
-                now.AddMinutes(options.Value.SessionLifetimeMinutes),
                 now,
                 options.Value.ReconnectGraceSeconds,
                 [peer]);
@@ -84,11 +83,6 @@ public sealed class Handler(
         if (session is null)
         {
             return Result<Response>.Failure(Errors.Session.NotFound());
-        }
-
-        if (session.IsExpired(clock.UtcNow))
-        {
-            return Result<Response>.Failure(Errors.Session.Expired());
         }
 
         var now = clock.UtcNow;

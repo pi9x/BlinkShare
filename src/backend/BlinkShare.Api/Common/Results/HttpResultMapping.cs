@@ -60,7 +60,6 @@ public static class HttpResultMapping
         "session.invalid_resume_token" => StatusCodes.Status403Forbidden,
         "session.peer_not_found" => StatusCodes.Status404NotFound,
         "session.not_found" => StatusCodes.Status404NotFound,
-        "session.expired" => StatusCodes.Status410Gone,
         "session.reconnect_grace_elapsed" => StatusCodes.Status410Gone,
         "auth.duplicate_email" => StatusCodes.Status409Conflict,
         "auth.invalid_credentials" => StatusCodes.Status401Unauthorized,

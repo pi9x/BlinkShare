@@ -33,17 +33,17 @@ public sealed class BlinkShareBearerAuthenticationHandler(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(Context.RequestAborted);
 
         var account = await dbContext.AuthSessions
-            .AsNoTracking()
             .Where(session => session.TokenHash == tokenHash)
             .Where(session => session.RevokedAtUtc == null && session.ExpiresAtUtc > DateTimeOffset.UtcNow)
             .Join(
-                dbContext.Accounts.AsNoTracking(),
+                dbContext.Accounts,
                 session => session.AccountId,
                 account => account.Id,
                 (session, account) => new
                 {
                     account.Id,
-                    account.Email
+                    account.Email,
+                    account.Tier
                 })
             .SingleOrDefaultAsync(Context.RequestAborted);
 
@@ -55,7 +55,8 @@ public sealed class BlinkShareBearerAuthenticationHandler(
         var claims = new List<Claim>
         {
             new(BlinkShareAuthConstants.AccountIdClaimType, account.Id.ToString("D")),
-            new(BlinkShareAuthConstants.AccountEmailClaimType, account.Email)
+            new(BlinkShareAuthConstants.AccountEmailClaimType, account.Email),
+            new(BlinkShareAuthConstants.AccountTierClaimType, account.Tier.ToString())
         };
 
         var identity = new ClaimsIdentity(claims, BlinkShareAuthConstants.SchemeName);

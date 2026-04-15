@@ -54,10 +54,17 @@ import { formatBytes } from '../../utils/bytes';
       @if (item().kind === 'text') {
         <pre class="max-h-40 overflow-auto p-3 text-xs leading-5 text-slate-100" style="border-radius: var(--radius-ui); background: var(--code-dark);">{{ item().text }}</pre>
       } @else {
-        <div class="px-3 py-2 text-sm" style="border-radius: var(--radius-ui); background: var(--code-dark); color: #E2E8F0;">
-          <p class="font-semibold text-white">{{ item().fileName }}</p>
-          <p>{{ item().contentType || 'Unknown content type' }}</p>
-          <p>{{ formatBytes(item().sizeBytes) }}</p>
+        <div class="flex items-start gap-2.5 px-3 py-2 text-sm" style="border-radius: var(--radius-ui); background: var(--code-dark); color: #E2E8F0;">
+          <div class="mt-0.5 shrink-0 rounded-[0.35rem] border p-1.5" style="border-color: #2b4351; background: #15212a; color: #7a9baa;">
+            <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+              <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" />
+              <path d="M14 2v5h5" />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="truncate font-semibold text-white">{{ item().fileName || 'Unnamed file' }}</p>
+            <p class="truncate">{{ item().contentType || 'Unknown content type' }} · {{ formatBytes(item().sizeBytes) }}</p>
+          </div>
         </div>
       }
     </article>

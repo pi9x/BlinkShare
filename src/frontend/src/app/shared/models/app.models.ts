@@ -1,4 +1,4 @@
-export enum ShareTier {
+export enum AccountTier {
   Anonymous = 1,
   Free = 2,
   Premium = 3,
@@ -55,7 +55,6 @@ export const EDITOR_LANGUAGES: EditorLanguageOption[] = [
 ];
 
 export interface CreateTextRequest {
-  tier: ShareTier;
   text: string | null;
 }
 
@@ -94,7 +93,6 @@ export interface UnlockResponse {
 }
 
 export interface CreateFileUploadRequest {
-  tier: ShareTier;
   fileName: string | null;
   contentType: string | null;
   sizeBytes: number;
@@ -167,6 +165,7 @@ export interface PublishAnonymousFileMetadataRequest {
   fileName: string | null;
   contentType: string | null;
   sizeBytes: number;
+  shareCode?: string | null;
 }
 
 export interface PublishAnonymousFileMetadataResponse {
@@ -175,6 +174,7 @@ export interface PublishAnonymousFileMetadataResponse {
   fileName: string;
   contentType: string;
   sizeBytes: number;
+  shareCode?: string | null;
   publishedAtUtc: string;
 }
 
@@ -191,6 +191,7 @@ export interface LoginRequest {
 export interface AuthSessionResponse {
   accountId: string;
   email: string;
+  tier: AccountTier;
   sessionToken: string;
   sessionExpiresAtUtc: string;
 }
@@ -198,11 +199,12 @@ export interface AuthSessionResponse {
 export interface CurrentAccountResponse {
   accountId: string;
   email: string;
+  tier: AccountTier;
   createdAtUtc: string;
 }
 
 export interface QuotaUsageResponse {
-  tier: ShareTier;
+  tier: AccountTier;
   bytesUsedToday: number;
   bytesLimitToday: number;
   sharesCreatedToday: number;

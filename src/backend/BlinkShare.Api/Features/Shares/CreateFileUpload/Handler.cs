@@ -1,3 +1,4 @@
+using BlinkShare.Api.Common.Auth;
 using BlinkShare.Api.Common.Results;
 using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Infrastructure.ObjectStorage;
@@ -13,6 +14,7 @@ public sealed class Handler(
     Validator validator,
     ICodeGenerator codeGenerator,
     IObjectStorage objectStorage,
+    ICurrentAccountAccessor currentAccountAccessor,
     IClock clock,
     IOptions<CreateFileUploadOptions> options) : BlinkShare.Api.Common.DependencyInjection.ISliceService
 {
@@ -20,7 +22,12 @@ public sealed class Handler(
 
     public async Task<Result<Response>> HandleAsync(Command command, CancellationToken cancellationToken)
     {
-        var validationResult = validator.Validate(command);
+        var effectiveCommand = command with
+        {
+            Tier = currentAccountAccessor.GetCurrentAccount()?.Tier ?? AccountTier.Anonymous
+        };
+
+        var validationResult = validator.Validate(effectiveCommand);
         if (validationResult.IsFailure)
         {
             return Result<Response>.Failure(validationResult.Error!);
@@ -37,21 +44,20 @@ public sealed class Handler(
         var createdAtUtc = clock.UtcNow;
         var expiresAtUtc = createdAtUtc.AddMinutes(options.Value.FreeTierTtlMinutes);
         var code = codeResult.Value!;
-        var storageKey = CreateStorageKey(code, command.FileName!);
+        var storageKey = CreateStorageKey(code, effectiveCommand.FileName!);
 
         var share = new Share(
             id: Guid.NewGuid(),
             code: code,
-            tier: command.Tier,
             mode: ShareMode.StoredShare,
             kind: ShareKind.File,
             status: ShareStatus.Pending,
             ownerUserId: null,
             passcodeHash: null,
             textInline: null,
-            fileName: command.FileName,
-            contentType: command.ContentType,
-            sizeBytes: command.SizeBytes,
+            fileName: effectiveCommand.FileName,
+            contentType: effectiveCommand.ContentType,
+            sizeBytes: effectiveCommand.SizeBytes,
             storageKey: storageKey,
             createdAtUtc: createdAtUtc,
             expiresAtUtc: expiresAtUtc,
@@ -60,7 +66,7 @@ public sealed class Handler(
             maxDownloadCount: null);
 
         var uploadTarget = await objectStorage.CreateUploadTargetAsync(
-            new ObjectStorageUploadRequest(storageKey, command.ContentType!, command.SizeBytes, expiresAtUtc),
+            new ObjectStorageUploadRequest(storageKey, effectiveCommand.ContentType!, effectiveCommand.SizeBytes, expiresAtUtc),
             cancellationToken);
 
         await dbContext.Shares.AddAsync(share, cancellationToken);
@@ -82,7 +88,6 @@ public sealed class Handler(
         {
             var code = codeGenerator.GenerateShareCode();
             var exists = await dbContext.Shares
-                .AsNoTracking()
                 .AnyAsync(share => share.Code == code, cancellationToken);
 
             if (!exists)

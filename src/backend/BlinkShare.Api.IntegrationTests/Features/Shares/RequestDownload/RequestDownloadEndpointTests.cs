@@ -19,7 +19,6 @@ public sealed class RequestDownloadEndpointTests(BlinkShareApiFactory factory) :
         await SeedShareAsync(new Share(
             shareId,
             "FILE0001",
-            ShareTier.Free,
             ShareMode.StoredShare,
             ShareKind.File,
             ShareStatus.Ready,

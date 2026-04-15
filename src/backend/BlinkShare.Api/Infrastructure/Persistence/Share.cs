@@ -9,7 +9,6 @@ public sealed class Share
     public Share(
         Guid id,
         string code,
-        ShareTier tier,
         ShareMode mode,
         ShareKind kind,
         ShareStatus status,
@@ -28,7 +27,6 @@ public sealed class Share
     {
         Id = id;
         Code = code;
-        Tier = tier;
         Mode = mode;
         Kind = kind;
         Status = status;
@@ -49,8 +47,6 @@ public sealed class Share
     public Guid Id { get; private set; }
 
     public string Code { get; private set; } = string.Empty;
-
-    public ShareTier Tier { get; private set; }
 
     public ShareMode Mode { get; private set; }
 
@@ -85,35 +81,4 @@ public sealed class Share
     public DateTimeOffset? StorageCleanupCompletedAtUtc { get; private set; }
 
     public bool HasPasscode() => !string.IsNullOrWhiteSpace(PasscodeHash);
-
-    public void MarkAccessed(DateTimeOffset accessedAtUtc)
-    {
-        LastAccessedAtUtc = accessedAtUtc;
-    }
-
-    public void MarkReady()
-    {
-        Status = ShareStatus.Ready;
-    }
-
-    public void RecordDownload(DateTimeOffset accessedAtUtc)
-    {
-        DownloadCount++;
-        LastAccessedAtUtc = accessedAtUtc;
-    }
-
-    public void MarkExpired()
-    {
-        Status = ShareStatus.Expired;
-    }
-
-    public void MarkDeleted()
-    {
-        Status = ShareStatus.Deleted;
-    }
-
-    public void MarkStorageCleanupCompleted(DateTimeOffset completedAtUtc)
-    {
-        StorageCleanupCompletedAtUtc = completedAtUtc;
-    }
 }

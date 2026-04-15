@@ -85,6 +85,24 @@ a {
   border-radius: var(--radius-ui);
 }
 
+.recent-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-label) transparent;
+}
+
+.recent-scroll::-webkit-scrollbar {
+  width: 0.45rem;
+}
+
+.recent-scroll::-webkit-scrollbar-thumb {
+  background: var(--muted-label);
+  border-radius: 999px;
+}
+
+.recent-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .app-button {
   display: inline-flex;
   align-items: center;

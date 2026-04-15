@@ -2,6 +2,7 @@ using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Infrastructure.Persistence;
 using BlinkShare.Worker.Features.CleanupObjects;
 using BlinkShare.Worker.UnitTests.TestDoubles;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -20,7 +21,6 @@ public sealed class HandlerTests
             await dbContext.Shares.AddAsync(new Share(
                 Guid.NewGuid(),
                 "FILE0001",
-                ShareTier.Free,
                 ShareMode.StoredShare,
                 ShareKind.File,
                 ShareStatus.Expired,
@@ -57,10 +57,21 @@ public sealed class HandlerTests
     private static IDbContextFactory<BlinkShareDbContext> CreateDbContextFactory(string databaseName)
     {
         var options = new DbContextOptionsBuilder<BlinkShareDbContext>()
-            .UseInMemoryDatabase(databaseName)
+            .UseSqlite(CreateOpenConnection(databaseName))
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        return new TestDbContextFactory(options);
+        var factory = new TestDbContextFactory(options);
+        using var dbContext = factory.CreateDbContext();
+        dbContext.Database.EnsureCreated();
+        return factory;
+    }
+
+    private static SqliteConnection CreateOpenConnection(string databaseName)
+    {
+        var connection = new SqliteConnection($"Data Source={databaseName};Mode=Memory;Cache=Shared");
+        connection.Open();
+        return connection;
     }
 
     private sealed class TestDbContextFactory(DbContextOptions<BlinkShareDbContext> options)

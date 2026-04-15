@@ -21,18 +21,42 @@ public sealed class Handler(
             .Where(share => share.StorageKey != null)
             .Where(share => share.StorageCleanupCompletedAtUtc == null)
             .Where(share => share.Status == ShareStatus.Expired || share.Status == ShareStatus.Deleted)
-            .OrderBy(share => share.ExpiresAtUtc)
+            .OrderBy(share => share.Id)
             .Take(options.Value.BatchSize)
+            .Select(share => new CleanupCandidate(share.Id, share.StorageKey!))
             .ToListAsync(cancellationToken);
 
-        foreach (var share in candidates)
+        foreach (var candidate in candidates)
         {
-            await objectStorage.DeleteObjectAsync(share.StorageKey!, cancellationToken);
-            share.MarkStorageCleanupCompleted(clock.UtcNow);
+            await objectStorage.DeleteObjectAsync(candidate.StorageKey, cancellationToken);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await MarkCleanupCompletedAsync(
+            dbContext,
+            candidates.Select(candidate => candidate.Id).ToArray(),
+            clock.UtcNow,
+            cancellationToken);
 
         return candidates.Count;
     }
+
+    private static async Task MarkCleanupCompletedAsync(
+        BlinkShareDbContext dbContext,
+        Guid[] shareIds,
+        DateTimeOffset completedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        if (shareIds.Length == 0)
+        {
+            return;
+        }
+
+        await dbContext.Shares
+            .Where(share => shareIds.Contains(share.Id))
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(share => share.StorageCleanupCompletedAtUtc, completedAtUtc),
+                cancellationToken);
+    }
+
+    private sealed record CleanupCandidate(Guid Id, string StorageKey);
 }

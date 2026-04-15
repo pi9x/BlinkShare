@@ -21,7 +21,6 @@ public sealed class UnlockEndpointTests(BlinkShareApiFactory factory) : IClassFi
         await SeedShareAsync(new Share(
             Guid.NewGuid(),
             "LOCK0001",
-            ShareTier.Free,
             ShareMode.StoredShare,
             ShareKind.Text,
             ShareStatus.Ready,
@@ -59,7 +58,6 @@ public sealed class UnlockEndpointTests(BlinkShareApiFactory factory) : IClassFi
         await SeedShareAsync(new Share(
             Guid.NewGuid(),
             "LOCK0001",
-            ShareTier.Free,
             ShareMode.StoredShare,
             ShareKind.Text,
             ShareStatus.Ready,

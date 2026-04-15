@@ -49,7 +49,6 @@ function mapCodeToKind(code?: string): AppError['kind'] {
     case 'session.peer_not_found':
       return 'notFound';
     case 'share.expired':
-    case 'session.expired':
     case 'session.reconnect_grace_elapsed':
       return 'expired';
     case 'quota.daily_bytes_exceeded':

@@ -8,14 +8,9 @@ public sealed class Validator(IOptions<CreateFileUploadOptions> options) : Blink
 {
     public Result Validate(Command command)
     {
-        if (command.Tier == ShareTier.Anonymous)
+        if (command.Tier is not AccountTier.Anonymous and not AccountTier.Free)
         {
-            return Result.Failure(Errors.Share.AnonymousRelayNotSupported());
-        }
-
-        if (command.Tier != ShareTier.Free)
-        {
-            return Result.Failure(Errors.Share.UnsupportedTier("Only the free tier is currently handled by this slice."));
+            return Result.Failure(Errors.Share.UnsupportedTier("Only anonymous and free accounts are currently supported."));
         }
 
         if (string.IsNullOrWhiteSpace(command.FileName))
@@ -33,10 +28,14 @@ public sealed class Validator(IOptions<CreateFileUploadOptions> options) : Blink
             return Result.Failure(Errors.General.Validation("File size must be greater than zero."));
         }
 
-        if (command.SizeBytes > options.Value.MaxFileSizeBytes)
+        var maxFileSizeBytes = command.Tier == AccountTier.Free
+            ? options.Value.FreeMaxFileSizeBytes
+            : options.Value.AnonymousMaxFileSizeBytes;
+
+        if (command.SizeBytes > maxFileSizeBytes)
         {
             return Result.Failure(Errors.Share.FileTooLarge(
-                $"File size cannot exceed {options.Value.MaxFileSizeBytes} bytes."));
+                $"File size cannot exceed {maxFileSizeBytes} bytes."));
         }
 
         return Result.Success();

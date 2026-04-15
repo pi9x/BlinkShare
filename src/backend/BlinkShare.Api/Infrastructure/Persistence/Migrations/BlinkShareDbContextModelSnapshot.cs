@@ -54,6 +54,12 @@ namespace BlinkShare.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("Tier")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("tier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
@@ -191,12 +197,6 @@ namespace BlinkShare.Api.Infrastructure.Persistence.Migrations
                     b.Property<string>("TextInline")
                         .HasColumnType("text")
                         .HasColumnName("text_inline");
-
-                    b.Property<string>("Tier")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("tier");
 
                     b.HasKey("Id");
 

@@ -11,10 +11,9 @@ public static class ServiceCollectionExtensions
 
         services.AddOptions<CreateFileUploadOptions>()
             .Bind(configuration.GetSection("Shares:CreateFileUpload"))
-            .Validate(options => options.MaxFileSizeBytes > 0, "MaxFileSizeBytes must be positive.")
+            .Validate(options => options.AnonymousMaxFileSizeBytes > 0, "AnonymousMaxFileSizeBytes must be positive.")
+            .Validate(options => options.FreeMaxFileSizeBytes > 0, "FreeMaxFileSizeBytes must be positive.")
             .Validate(options => options.FreeTierTtlMinutes > 0, "FreeTierTtlMinutes must be positive.");
-
-        services.AddSingleton<Validator>();
 
         return services;
     }

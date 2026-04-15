@@ -19,7 +19,6 @@ public sealed class CompleteFileUploadEndpointTests(BlinkShareApiFactory factory
         await SeedShareAsync(new Share(
             Guid.NewGuid(),
             "FILE0001",
-            ShareTier.Free,
             ShareMode.StoredShare,
             ShareKind.File,
             ShareStatus.Pending,
@@ -55,7 +54,6 @@ public sealed class CompleteFileUploadEndpointTests(BlinkShareApiFactory factory
         await SeedShareAsync(new Share(
             Guid.NewGuid(),
             "FILE0001",
-            ShareTier.Free,
             ShareMode.StoredShare,
             ShareKind.File,
             ShareStatus.Ready,

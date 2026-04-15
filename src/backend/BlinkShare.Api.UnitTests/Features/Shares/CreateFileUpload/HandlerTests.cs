@@ -1,3 +1,4 @@
+using BlinkShare.Api.Common.Auth;
 using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Features.Shares.CreateFileUpload;
 using BlinkShare.Api.Infrastructure.ObjectStorage;
@@ -16,7 +17,7 @@ public sealed class HandlerTests
     {
         var handler = CreateHandler(CreateDbContextFactory(Guid.NewGuid().ToString("N")));
 
-        var result = await handler.HandleAsync(new Command(ShareTier.Free, null, "text/plain", 12), CancellationToken.None);
+        var result = await handler.HandleAsync(new Command(AccountTier.Free, null, "text/plain", 12), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("general.validation", result.Error!.Code);
@@ -27,10 +28,10 @@ public sealed class HandlerTests
     {
         var databaseName = Guid.NewGuid().ToString("N");
         var dbContextFactory = CreateDbContextFactory(databaseName);
-        var handler = CreateHandler(dbContextFactory);
+        var handler = CreateHandler(dbContextFactory, authenticated: true);
 
         var result = await handler.HandleAsync(
-            new Command(ShareTier.Free, "report.txt", "text/plain", 12),
+            new Command(AccountTier.Free, "report.txt", "text/plain", 12),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -48,20 +49,56 @@ public sealed class HandlerTests
         Assert.NotNull(share.StorageKey);
     }
 
-    private static Handler CreateHandler(IDbContextFactory<BlinkShareDbContext> dbContextFactory) =>
+    [Fact]
+    public async Task Anonymous_request_larger_than_limit_returns_validation_failure()
+    {
+        var handler = CreateHandler(CreateDbContextFactory(Guid.NewGuid().ToString("N")));
+
+        var result = await handler.HandleAsync(
+            new Command(AccountTier.Free, "report.txt", "text/plain", (512 * 1024) + 1),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("share.file_too_large", result.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Authenticated_request_allows_free_limit()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var dbContextFactory = CreateDbContextFactory(databaseName);
+        var handler = CreateHandler(dbContextFactory, authenticated: true);
+
+        var result = await handler.HandleAsync(
+            new Command(AccountTier.Anonymous, "report.txt", "text/plain", 1024 * 1024),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var share = await dbContext.Shares.AsNoTracking().SingleAsync();
+        Assert.Equal(1024 * 1024, share.SizeBytes);
+    }
+
+    private static Handler CreateHandler(
+        IDbContextFactory<BlinkShareDbContext> dbContextFactory,
+        bool authenticated = false) =>
         new(
             dbContextFactory,
             new Validator(Options.Create(new CreateFileUploadOptions
             {
-                MaxFileSizeBytes = 1024,
+                AnonymousMaxFileSizeBytes = 512 * 1024,
+                FreeMaxFileSizeBytes = 1024 * 1024,
                 FreeTierTtlMinutes = 5
             })),
             new FixedCodeGenerator("FILE1234"),
             new FakeObjectStorage(),
+            new FakeCurrentAccountAccessor(authenticated),
             new FakeClock(new DateTimeOffset(2026, 4, 12, 10, 30, 0, TimeSpan.Zero)),
             Options.Create(new CreateFileUploadOptions
             {
-                MaxFileSizeBytes = 1024,
+                AnonymousMaxFileSizeBytes = 512 * 1024,
+                FreeMaxFileSizeBytes = 1024 * 1024,
                 FreeTierTtlMinutes = 5
             }));
 
@@ -91,5 +128,11 @@ public sealed class HandlerTests
     private sealed class FakeClock(DateTimeOffset utcNow) : IClock
     {
         public DateTimeOffset UtcNow { get; } = utcNow;
+    }
+
+    private sealed class FakeCurrentAccountAccessor(bool authenticated) : ICurrentAccountAccessor
+    {
+        public CurrentAccount? GetCurrentAccount() =>
+            authenticated ? new CurrentAccount(Guid.NewGuid(), "tester@example.com", AccountTier.Free) : null;
     }
 }

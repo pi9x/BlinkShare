@@ -16,11 +16,11 @@ public sealed class Handler(
         cancellationToken.ThrowIfCancellationRequested();
 
         var currentAccount = currentAccountAccessor.GetCurrentAccount();
-        var tier = currentAccount is null ? ShareTier.Anonymous : ShareTier.Free;
-        var bytesLimit = tier == ShareTier.Free
+        var tier = currentAccount?.Tier ?? AccountTier.Anonymous;
+        var bytesLimit = tier == AccountTier.Free
             ? options.Value.FreeBytesLimitToday
             : options.Value.AnonymousBytesLimitToday;
-        var sharesCreatedLimit = tier == ShareTier.Free
+        var sharesCreatedLimit = tier == AccountTier.Free
             ? options.Value.FreeSharesCreatedLimitToday
             : options.Value.AnonymousSharesCreatedLimitToday;
         var now = clock.UtcNow;
