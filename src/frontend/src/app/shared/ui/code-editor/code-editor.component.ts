@@ -96,6 +96,17 @@ const blinkShareHighlightStyle = HighlightStyle.define([
         color: #446e7e;
       }
 
+      :host ::ng-deep .cm-lineNumbers {
+        min-width: 2.6rem;
+      }
+
+      :host ::ng-deep .cm-lineNumbers .cm-gutterElement {
+        box-sizing: border-box;
+        min-width: 2.6rem;
+        padding: 0 0.7rem 0 0.35rem;
+        text-align: right;
+      }
+
       :host ::ng-deep .cm-content,
       :host ::ng-deep .cm-gutter {
         min-height: 100%;
@@ -140,6 +151,8 @@ export class CodeEditorComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   private view: EditorView | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private measureFrame: number | null = null;
 
   public readonly value = input('');
   public readonly language = input<EditorLanguage>('plaintext');
@@ -151,54 +164,65 @@ export class CodeEditorComponent {
 
   public constructor() {
     effect(() => {
-      if (!this.view) {
+      const nextValue = this.value();
+      const view = this.view;
+      if (!view) {
         return;
       }
 
-      const nextValue = this.value();
-      const currentValue = this.view.state.doc.toString();
+      const currentValue = view.state.doc.toString();
       if (nextValue !== currentValue) {
-        this.view.dispatch({
+        view.dispatch({
           changes: {
             from: 0,
             to: currentValue.length,
             insert: nextValue,
           },
         });
+        this.scheduleMeasure();
       }
     });
 
     effect(() => {
-      if (!this.view) {
+      const language = this.language();
+      const view = this.view;
+      if (!view) {
         return;
       }
 
-      this.view.dispatch({
-        effects: this.languageCompartment.reconfigure(this.createLanguageExtension(this.language())),
+      view.dispatch({
+        effects: this.languageCompartment.reconfigure(this.createLanguageExtension(language)),
       });
+      this.scheduleMeasure();
     });
 
     effect(() => {
-      if (!this.view) {
+      const readOnly = this.readOnly();
+      const view = this.view;
+      if (!view) {
         return;
       }
 
-      this.view.dispatch({
+      view.dispatch({
         effects: [
-          this.readOnlyCompartment.reconfigure(EditorState.readOnly.of(this.readOnly())),
-          this.editableCompartment.reconfigure(EditorView.editable.of(!this.readOnly())),
+          this.readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly)),
+          this.editableCompartment.reconfigure(EditorView.editable.of(!readOnly)),
         ],
       });
+      this.scheduleMeasure();
     });
 
     effect(() => {
-      if (!this.view) {
+      const wrap = this.wrap();
+      const view = this.view;
+      if (!view) {
         return;
       }
 
-      this.view.dispatch({
-        effects: this.wrapCompartment.reconfigure(this.wrap() ? EditorView.lineWrapping : []),
+      view.dispatch({
+        effects: this.wrapCompartment.reconfigure(wrap ? EditorView.lineWrapping : []),
       });
+      this.scheduleMeasure();
     });
   }
 
@@ -270,11 +294,21 @@ export class CodeEditorComponent {
       parent: host,
     });
 
+    this.resizeObserver = new ResizeObserver(() => this.scheduleMeasure());
+    this.resizeObserver.observe(host);
+    this.scheduleMeasure();
+
     if (!this.readOnly()) {
       queueMicrotask(() => this.view?.focus());
     }
 
     this.destroyRef.onDestroy(() => {
+      this.resizeObserver?.disconnect();
+      this.resizeObserver = null;
+      if (this.measureFrame !== null) {
+        cancelAnimationFrame(this.measureFrame);
+        this.measureFrame = null;
+      }
       this.view?.destroy();
       this.view = null;
     });
@@ -296,6 +330,20 @@ export class CodeEditorComponent {
         to: currentValue.length,
         insert: '',
       },
+    });
+    this.scheduleMeasure();
+  }
+
+  private scheduleMeasure(): void {
+    if (this.measureFrame !== null) {
+      cancelAnimationFrame(this.measureFrame);
+    }
+
+    this.measureFrame = requestAnimationFrame(() => {
+      this.measureFrame = requestAnimationFrame(() => {
+        this.measureFrame = null;
+        this.view?.requestMeasure();
+      });
     });
   }
 

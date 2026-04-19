@@ -19,6 +19,7 @@ import { LocalHistoryStorage } from '../../core/storage/local-history.storage';
 import { SessionRestoreStorage } from '../../core/storage/session-restore.storage';
 import { AppError } from '../../core/errors/app-error.model';
 import { toAppError } from '../../core/http/api-error.mapper';
+import { APP_RUNTIME_CONFIG } from '../../core/config/app-runtime-config';
 import { formatBytes } from '../../shared/utils/bytes';
 import {
   CreateOrJoinAnonymousSessionResponse,
@@ -32,9 +33,6 @@ import {
 
 type SessionStatus = 'idle' | 'creating' | 'connected' | 'reconnecting' | 'error';
 type BusyAction = 'share' | 'session' | 'file-share' | 'file-session' | null;
-
-const AnonymousMaxFileSizeBytes = 512 * 1024;
-const FreeMaxFileSizeBytes = 1024 * 1024;
 
 interface WorkspaceState {
   initialized: boolean;
@@ -253,7 +251,7 @@ export class WorkspaceStore {
       }));
       void this.loadQuota();
     } catch (error) {
-      this.failSession(error, 'share');
+      await this.failSession(error, 'share');
     }
   }
 
@@ -279,7 +277,10 @@ export class WorkspaceStore {
     }));
 
     try {
-      const response = await this.realtimeService.publishText(session, payload);
+      const response = await this.executeRecoverableSessionAction(
+        'session',
+        () => this.realtimeService.publishText(this.requireActiveSession(), payload),
+      );
 
       this.appendHistory({
         id: crypto.randomUUID(),
@@ -298,7 +299,7 @@ export class WorkspaceStore {
       }));
       return true;
     } catch (error) {
-      this.failSession(error, 'session');
+      await this.failSession(error, 'session');
       return false;
     }
   }
@@ -323,11 +324,15 @@ export class WorkspaceStore {
     }));
 
     try {
-      const response = await this.realtimeService.publishFileMetadata(
-        session,
-        file.name,
-        file.type || 'application/octet-stream',
-        file.size,
+      const response = await this.executeRecoverableSessionAction(
+        'file-session',
+        () =>
+          this.realtimeService.publishFileMetadata(
+            this.requireActiveSession(),
+            file.name,
+            file.type || 'application/octet-stream',
+            file.size,
+          ),
       );
 
       this.appendHistory({
@@ -347,7 +352,7 @@ export class WorkspaceStore {
         busyAction: null,
       }));
     } catch (error) {
-      this.failSession(error, 'file-session');
+      await this.failSession(error, 'file-session');
     }
   }
 
@@ -356,8 +361,8 @@ export class WorkspaceStore {
     onProgress?: (percent: number) => void,
   ): Promise<boolean> {
     const maxFileSizeBytes = this.authStore.authenticated()
-      ? FreeMaxFileSizeBytes
-      : AnonymousMaxFileSizeBytes;
+      ? APP_RUNTIME_CONFIG.freeAccountMaxFileSizeBytes
+      : APP_RUNTIME_CONFIG.anonymousMaxFileSizeBytes;
 
     if (file.size > maxFileSizeBytes) {
       this.state.update((state) => ({
@@ -394,12 +399,16 @@ export class WorkspaceStore {
 
       const session = this.state().session;
       const relay = session
-        ? await this.realtimeService.publishFileMetadata(
-            session,
-            file.name,
-            file.type || 'application/octet-stream',
-            file.size,
-            created.code,
+        ? await this.executeRecoverableSessionAction(
+            'file-share',
+            () =>
+              this.realtimeService.publishFileMetadata(
+                this.requireActiveSession(),
+                file.name,
+                file.type || 'application/octet-stream',
+                file.size,
+                created.code,
+              ),
           )
         : null;
 
@@ -428,7 +437,7 @@ export class WorkspaceStore {
       void this.loadQuota();
       return true;
     } catch (error) {
-      this.failSession(error, 'file-share');
+      await this.failSession(error, 'file-share');
       return false;
     }
   }
@@ -470,7 +479,7 @@ export class WorkspaceStore {
         busyAction: null,
       }));
     } catch (error) {
-      this.failSession(error, 'session');
+      await this.failSession(error, 'session');
     }
   }
 
@@ -698,7 +707,11 @@ export class WorkspaceStore {
     }
   }
 
-  private failSession(error: unknown, busyAction: BusyAction): void {
+  private async failSession(error: unknown, busyAction: BusyAction): Promise<void> {
+    if (await this.tryRecoverRecoverableSessionError(error, busyAction)) {
+      return;
+    }
+
     const appError = toAppError(error);
     if (busyAction === 'session' || busyAction === 'file-session') {
       void this.realtimeService.disconnect();
@@ -710,6 +723,59 @@ export class WorkspaceStore {
       sessionStatus: busyAction === 'share' || busyAction === 'file-share' ? state.sessionStatus : 'error',
       sessionError: appError,
     }));
+  }
+
+  private async executeRecoverableSessionAction<T>(
+    busyAction: BusyAction,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await action();
+    } catch (error) {
+      const recovered = await this.tryRecoverRecoverableSessionError(error, busyAction);
+      if (!recovered) {
+        throw error;
+      }
+
+      return action();
+    }
+  }
+
+  private async tryRecoverRecoverableSessionError(
+    error: unknown,
+    busyAction: BusyAction,
+  ): Promise<boolean> {
+    const appError = toAppError(error);
+    if (!this.isRecoverableResumeError(appError)) {
+      return false;
+    }
+
+    const session = this.state().session;
+    if (!session) {
+      return false;
+    }
+
+    this.sessionRestoreStorage.clear();
+    await this.realtimeService.disconnect();
+    this.state.update((state) => ({
+      ...state,
+      busyAction,
+      session: null,
+      sessionStatus: 'reconnecting',
+      sessionError: null,
+    }));
+
+    await this.createOrJoinSession(session.code);
+    return this.state().sessionStatus === 'connected' && this.state().session !== null;
+  }
+
+  private requireActiveSession(): StoredAnonymousSession {
+    const session = this.state().session;
+    if (!session) {
+      throw new Error('session.not_found|Peer session was not found.');
+    }
+
+    return session;
   }
 
   private isRecoverableResumeError(error: AppError): boolean {

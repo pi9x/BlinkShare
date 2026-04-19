@@ -9,11 +9,27 @@ import { ClipboardItemCardComponent } from '../../shared/ui/clipboard-item-card/
 import { CodeEditorComponent } from '../../shared/ui/code-editor/code-editor.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state/empty-state.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge/status-badge.component';
-import { EDITOR_LANGUAGES, EditorLanguage } from '../../shared/models/app.models';
+import { EDITOR_LANGUAGES, EditorLanguage, LocalClipboardItem } from '../../shared/models/app.models';
 import { toAppError } from '../../core/http/api-error.mapper';
 import { copyText } from '../../shared/utils/clipboard';
 import { formatBytes } from '../../shared/utils/bytes';
 import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
+
+type PreviewState =
+  | {
+      kind: 'text';
+      title: string;
+      text: string;
+      language: EditorLanguage;
+    }
+  | {
+      kind: 'image';
+      title: string;
+      loading: boolean;
+      expired: boolean;
+      imageUrl: string | null;
+      downloadUrl: string | null;
+    };
 
 @Component({
   selector: 'app-workspace-page',
@@ -30,34 +46,32 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
   template: `
     <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1.4fr)_27rem]">
       <section class="space-y-3.5">
-        <article class="surface-card p-3.5">
+        <article class="surface-card p-3 sm:p-3.5">
           <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-stretch">
             <div class="flex h-full flex-col justify-between gap-2.5">
-              <div class="flex items-center justify-between gap-3">
-                <div>
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
                   <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your code</p>
-                  <div class="mt-1 flex h-[2.3rem] items-center">
+                  <div class="mt-1 flex min-h-[2.1rem] items-center sm:h-[2.3rem]">
                     @if (store.session(); as session) {
-                      <h2 class="font-code text-[1.8rem] leading-none font-bold tracking-[0.08em]" style="color: var(--text-strong);">{{ session.code }}</h2>
+                      <h2 class="font-code text-[1.65rem] leading-none font-bold tracking-[0.08em] sm:text-[1.8rem]" style="color: var(--text-strong);">{{ session.code }}</h2>
                     } @else {
-                      <h2 class="whitespace-nowrap text-[1.8rem] leading-none font-bold tracking-tight" style="color: var(--text-strong);">Not connected</h2>
+                      <h2 class="text-[1.65rem] leading-none font-bold tracking-tight sm:whitespace-nowrap sm:text-[1.8rem]" style="color: var(--text-strong);">Not connected</h2>
                     }
                   </div>
                 </div>
 
-                <div class="flex h-[3.25rem] min-w-[8.5rem] flex-col items-end justify-start text-right">
+                <div class="flex min-h-[2.1rem] shrink-0 flex-col items-end justify-start gap-1 pt-0.5 text-right sm:min-h-[2.9rem] sm:pt-0">
                   <app-status-badge [label]="store.sessionStatus()" [tone]="sessionTone()" />
-                  <div class="mt-1 text-xs font-semibold" style="color: var(--muted-label);">
-                    @if (store.session(); as session) {
+                  @if (store.session(); as session) {
+                    <div class="text-xs font-semibold leading-none sm:leading-normal" style="color: var(--muted-label);">
                       <span>{{ session.peerCount }} peer{{ session.peerCount === 1 ? '' : 's' }}</span>
-                    } @else {
-                      <span>&nbsp;</span>
-                    }
-                  </div>
+                    </div>
+                  }
                 </div>
               </div>
 
-              <div class="flex h-[2.15rem] items-center gap-1.5 overflow-hidden">
+              <div class="flex min-h-[2.15rem] flex-wrap items-center gap-1.5 overflow-hidden">
                 <button class="icon-button icon-button-active" type="button" (click)="store.createSession()" [disabled]="store.busyAction() !== null" aria-label="New code" title="New code">
                   <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                     <path d="M12 5v14" />
@@ -65,7 +79,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
                   </svg>
                 </button>
                 @if (store.session(); as session) {
-                  <button class="icon-button" [class.icon-button-success]="isCopied('session-code')" type="button" (click)="copy(session.code, 'session-code')" [attr.aria-label]="isCopied('session-code') ? 'Copied code' : 'Copy code'" [attr.title]="isCopied('session-code') ? 'Copied to clipboard' : 'Copy code'">
+                  <button class="icon-button icon-button-copy" [class.icon-button-success]="isCopied('session-code')" type="button" (click)="copy(session.code, 'session-code')" [attr.aria-label]="isCopied('session-code') ? 'Copied code' : 'Copy code'" [attr.title]="isCopied('session-code') ? 'Copied to clipboard' : 'Copy code'">
                     @if (isCopied('session-code')) {
                       <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                         <path d="m5 12 5 5L20 7" />
@@ -77,7 +91,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
                       </svg>
                     }
                   </button>
-                  <button class="icon-button" type="button" (click)="store.disconnectSession()" aria-label="Clear session" title="Clear session">
+                  <button class="icon-button icon-button-close" type="button" (click)="store.disconnectSession()" aria-label="Clear session" title="Clear session">
                     <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                       <path d="M18 6 6 18" />
                       <path d="m6 6 12 12" />
@@ -87,7 +101,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
               </div>
             </div>
 
-            <div class="surface-panel flex h-full flex-col justify-start p-2.5">
+            <div class="surface-panel flex h-full min-w-0 flex-col justify-start p-2.5">
               <label class="field-label">Connect to code</label>
               <div class="mt-2 flex items-center gap-1.5">
                 <input
@@ -107,7 +121,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
           </div>
         </article>
 
-        <article class="surface-card p-3.5">
+        <article class="surface-card p-3 sm:p-3.5">
           <div class="mb-2.5 flex items-center justify-between gap-2 overflow-x-auto pb-1">
             <div class="workspace-compact-select-shell">
               <select
@@ -140,7 +154,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
           </div>
         </article>
 
-        <article class="surface-card p-3.5">
+        <article class="surface-card p-3 sm:p-3.5">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p class="text-[1.2rem] font-semibold" style="color: var(--text-strong);">Files</p>
@@ -193,7 +207,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
             <h3 class="mt-1 text-[1.7rem] font-bold tracking-tight" style="color: var(--text-strong);">{{ latestShare.code }}</h3>
             <p class="mt-1.5 text-sm" style="color: var(--muted-label);">{{ formatRelativeTime(latestShare.expiresAtUtc) }}</p>
             <div class="mt-2.5 flex gap-2">
-              <button class="icon-button icon-button-active" [class.icon-button-success]="isCopied('latest-share')" type="button" (click)="copy(latestShare.code, 'latest-share')" [attr.aria-label]="isCopied('latest-share') ? 'Copied share code' : 'Copy share code'" [attr.title]="isCopied('latest-share') ? 'Copied to clipboard' : 'Copy share code'">
+              <button class="icon-button icon-button-copy" [class.icon-button-success]="isCopied('latest-share')" type="button" (click)="copy(latestShare.code, 'latest-share')" [attr.aria-label]="isCopied('latest-share') ? 'Copied share code' : 'Copy share code'" [attr.title]="isCopied('latest-share') ? 'Copied to clipboard' : 'Copy share code'">
                 @if (isCopied('latest-share')) {
                   <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                     <path d="m5 12 5 5L20 7" />
@@ -219,7 +233,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
         <article class="surface-card flex max-h-[34rem] min-h-[12rem] flex-col overflow-hidden p-0">
           <div class="sticky top-0 z-10 flex items-center justify-between gap-2 border-b px-3.5 py-3" style="border-color: var(--line-default); background: var(--surface-default);">
             <p class="text-[1.12rem] font-semibold" style="color: var(--text-strong);">Recent</p>
-            <button class="icon-button h-9 w-9" type="button" (click)="store.clearHistory()" aria-label="Clear history" title="Clear history">
+            <button class="icon-button icon-button-danger h-9 w-9" type="button" (click)="store.clearHistory()" aria-label="Clear history" title="Clear history">
               <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                 <path d="M3 6h18" />
                 <path d="M8 6V4h8v2" />
@@ -232,7 +246,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
             @if (store.history().length) {
               @for (item of store.history(); track item.id; let i = $index) {
                 <div class="pt-2.5" [class.pt-0]="i === 0" [style.border-top]="i === 0 ? 'none' : '1px solid var(--line-default)'">
-                  <app-clipboard-item-card [item]="item" [copied]="isCopied('history:' + item.id)" (copy)="copyItem(item)" (download)="downloadItem(item)" />
+                  <app-clipboard-item-card [item]="item" [copied]="isCopied('history:' + item.id)" (copy)="copyItem(item)" (download)="downloadItem(item)" (preview)="previewItem(item)" />
                 </div>
               }
             } @else {
@@ -271,6 +285,69 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
       </aside>
     </div>
 
+    @if (previewState(); as preview) {
+      <div class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 px-4 py-6" (click)="closePreview()">
+        <article class="surface-card max-h-[90vh] w-full max-w-4xl overflow-hidden" (click)="$event.stopPropagation()">
+          <div class="flex items-center justify-between gap-3 border-b px-4 py-3" style="border-color: var(--line-default);">
+            <div class="min-w-0">
+              <p class="text-xs font-bold uppercase tracking-[0.12em]" style="color: var(--muted-label);">Preview</p>
+              <h3 class="truncate text-lg font-semibold" style="color: var(--text-strong);">{{ preview.title }}</h3>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-2">
+              @if (preview.kind === 'text') {
+                <button class="icon-button icon-button-copy" [class.icon-button-success]="isCopied('preview-text')" type="button" (click)="copy(preview.text, 'preview-text')" [attr.aria-label]="isCopied('preview-text') ? 'Copied text' : 'Copy text'" [attr.title]="isCopied('preview-text') ? 'Copied to clipboard' : 'Copy text'">
+                  @if (isCopied('preview-text')) {
+                    <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                      <path d="m5 12 5 5L20 7" />
+                    </svg>
+                  } @else {
+                    <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                      <rect x="9" y="9" width="11" height="11" rx="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  }
+                </button>
+              } @else if (preview.kind === 'image' && !preview.expired && preview.downloadUrl) {
+                <button class="icon-button icon-button-active" type="button" (click)="downloadPreviewImage()" aria-label="Download image" title="Download image">
+                  <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <path d="M7 10 12 15 17 10" />
+                    <path d="M12 15V3" />
+                  </svg>
+                </button>
+              }
+
+              <button class="icon-button icon-button-close" type="button" (click)="closePreview()" aria-label="Close preview" title="Close preview">
+                <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="max-h-[calc(90vh-4.5rem)] overflow-auto p-4">
+            @if (preview.kind === 'text') {
+              <app-code-editor [value]="preview.text" [language]="preview.language" [readOnly]="true" [wrap]="true" />
+            } @else if (preview.kind === 'image') {
+              @if (preview.loading) {
+                <div class="surface-panel p-4 text-sm" style="color: var(--text-muted);">Preparing image preview...</div>
+              } @else if (preview.expired) {
+                <div class="surface-panel p-4 text-sm" style="color: var(--text-muted);">
+                  This image share has expired. Preview and download are no longer available.
+                </div>
+              } @else if (preview.imageUrl) {
+                <div class="flex justify-center rounded-[var(--radius-ui)] p-3" style="background: var(--code-dark);">
+                  <img [src]="preview.imageUrl" [alt]="preview.title" class="max-h-[70vh] max-w-full rounded-[var(--radius-ui)] object-contain" />
+                </div>
+              }
+            }
+          </div>
+        </article>
+      </div>
+    }
+
     @if (snackbarMessage(); as message) {
       <div class="pointer-events-none fixed right-4 bottom-4 z-50 max-w-sm sm:right-6 sm:bottom-6">
         <div class="pointer-events-auto flex items-start gap-3 rounded-[0.6rem] border px-4 py-3 shadow-sm" style="border-color: #f3d4cf; background: var(--danger-soft); color: var(--danger);">
@@ -283,7 +360,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/time';
             <p class="text-sm font-semibold">Something went wrong</p>
             <p class="mt-1 text-sm leading-5">{{ message }}</p>
           </div>
-          <button class="icon-button h-8 w-8 shrink-0" type="button" (click)="dismissSnackbar()" aria-label="Dismiss error" title="Dismiss error">
+          <button class="icon-button icon-button-close h-8 w-8 shrink-0" type="button" (click)="dismissSnackbar()" aria-label="Dismiss error" title="Dismiss error">
             <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
               <path d="M18 6 6 18" />
               <path d="m6 6 12 12" />
@@ -304,6 +381,7 @@ export class WorkspacePageComponent {
   protected readonly snackbarMessage = signal<string | null>(null);
   protected readonly selectedFile = signal<File | null>(null);
   protected readonly fileUploadProgress = signal<number | null>(null);
+  protected readonly previewState = signal<PreviewState | null>(null);
   protected readonly languages = EDITOR_LANGUAGES;
 
   private copiedHandle: ReturnType<typeof setTimeout> | null = null;
@@ -421,6 +499,82 @@ export class WorkspacePageComponent {
     } catch (error) {
       this.showSnackbar(toAppError(error).message);
     }
+  }
+
+  protected async previewItem(item: LocalClipboardItem): Promise<void> {
+    if (item.kind === 'text') {
+      this.previewState.set({
+        kind: 'text',
+        title: item.language ?? 'Plain text',
+        text: item.text ?? '',
+        language: item.language ?? 'plaintext',
+      });
+      return;
+    }
+
+    if (!this.isImageItem(item)) {
+      return;
+    }
+
+    const loadingState: PreviewState = {
+      kind: 'image',
+      title: item.fileName ?? 'Image',
+      loading: true,
+      expired: false,
+      imageUrl: null,
+      downloadUrl: null,
+    };
+    this.previewState.set(loadingState);
+
+    if (!item.shareCode) {
+      this.previewState.set({
+        ...loadingState,
+        loading: false,
+        expired: true,
+      });
+      return;
+    }
+
+    try {
+      await firstValueFrom(this.sharesApi.getByCode(item.shareCode));
+      const response = await firstValueFrom(this.sharesApi.requestDownload(item.shareCode));
+      this.previewState.set({
+        ...loadingState,
+        loading: false,
+        imageUrl: response.downloadUrl,
+        downloadUrl: response.downloadUrl,
+      });
+    } catch (error) {
+      const appError = toAppError(error);
+      if (appError.kind === 'expired' || appError.code === 'share.expired') {
+        this.previewState.set({
+          ...loadingState,
+          loading: false,
+          expired: true,
+        });
+        return;
+      }
+
+      this.closePreview();
+      this.showSnackbar(appError.message);
+    }
+  }
+
+  protected closePreview(): void {
+    this.previewState.set(null);
+  }
+
+  protected downloadPreviewImage(): void {
+    const preview = this.previewState();
+    if (preview?.kind !== 'image' || !preview.downloadUrl || preview.expired) {
+      return;
+    }
+
+    window.open(preview.downloadUrl, '_blank', 'noopener');
+  }
+
+  private isImageItem(item: LocalClipboardItem): boolean {
+    return item.kind === 'file-metadata' && (item.contentType ?? '').toLowerCase().startsWith('image/');
   }
 
   protected async sendDraft(): Promise<void> {

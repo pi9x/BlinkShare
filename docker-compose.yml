@@ -161,6 +161,11 @@ services:
     depends_on:
       api:
         condition: service_started
+    environment:
+      API_BASE_URL: ""
+      APP_NAME: BlinkShare
+      ANONYMOUS_MAX_FILE_SIZE_BYTES: 524288
+      FREE_ACCOUNT_MAX_FILE_SIZE_BYTES: 1048576
     ports:
       - "4200:80"
 

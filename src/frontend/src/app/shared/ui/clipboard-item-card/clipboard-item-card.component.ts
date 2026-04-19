@@ -22,9 +22,10 @@ import { formatBytes } from '../../utils/bytes';
           <p class="text-xs leading-none font-semibold" style="color: var(--muted-label);">{{ item().createdAtUtc | date: 'shortTime' }}</p>
           <button
             class="icon-button h-9 w-9"
+            [class.icon-button-copy]="item().kind === 'text' && !copied()"
             [class.icon-button-success]="item().kind === 'text' && copied()"
             type="button"
-            (click)="item().kind === 'text' ? copy.emit() : download.emit()"
+            (click)="$event.stopPropagation(); item().kind === 'text' ? copy.emit() : download.emit()"
             [attr.aria-label]="item().kind === 'text' ? (copied() ? 'Copied' : 'Copy') : 'Download'"
             [attr.title]="item().kind === 'text' ? (copied() ? 'Copied to clipboard' : 'Copy') : 'Download file'"
           >
@@ -49,9 +50,9 @@ import { formatBytes } from '../../utils/bytes';
       </div>
 
       @if (item().kind === 'text') {
-        <pre class="max-h-40 overflow-auto p-3 text-xs leading-5 text-slate-100" style="border-radius: var(--radius-ui); background: var(--code-dark);">{{ item().text }}</pre>
+        <pre class="max-h-40 cursor-pointer overflow-auto p-3 text-xs leading-5 text-slate-100" style="border-radius: var(--radius-ui); background: var(--code-dark);" (click)="preview.emit()">{{ item().text }}</pre>
       } @else {
-        <div class="flex items-start gap-2.5 px-3 py-2 text-sm" style="border-radius: var(--radius-ui); background: var(--code-dark); color: #E2E8F0;">
+        <div class="flex items-start gap-2.5 px-3 py-2 text-sm" [class.cursor-pointer]="isImageFile()" style="border-radius: var(--radius-ui); background: var(--code-dark); color: #E2E8F0;" (click)="preview.emit()">
           <div class="mt-0.5 shrink-0 rounded-[0.35rem] border p-1.5" style="border-color: #2b4351; background: #15212a; color: #7a9baa;">
             <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
               <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" />
@@ -73,6 +74,11 @@ export class ClipboardItemCardComponent {
   public readonly copied = input(false);
   public readonly copy = output<void>();
   public readonly download = output<void>();
+  public readonly preview = output<void>();
 
   protected readonly formatBytes = formatBytes;
+
+  protected isImageFile(): boolean {
+    return (this.item().contentType ?? '').toLowerCase().startsWith('image/');
+  }
 }

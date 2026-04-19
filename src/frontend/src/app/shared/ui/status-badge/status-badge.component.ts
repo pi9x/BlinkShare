@@ -5,7 +5,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
   standalone: true,
   template: `
     <span
-      class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.06em]"
+      class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-[0.08em] sm:gap-2 sm:px-3 sm:text-xs"
       [class]="classes()"
     >
       <span class="h-2 w-2 rounded-full bg-current"></span>

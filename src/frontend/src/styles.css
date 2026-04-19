@@ -204,6 +204,42 @@ a {
   color: var(--success);
 }
 
+.icon-button-copy {
+  background: white;
+  border-color: var(--line-default);
+  color: var(--text-strong);
+}
+
+.icon-button-copy:hover:not(:disabled) {
+  background: white;
+  border-color: var(--line-strong);
+  color: var(--surface-strong);
+}
+
+.icon-button-danger {
+  background: var(--danger-soft);
+  border-color: #f3d4cf;
+  color: var(--danger);
+}
+
+.icon-button-danger:hover:not(:disabled) {
+  background: #fde4df;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.icon-button-close {
+  background: #f7fafc;
+  border-color: var(--line-default);
+  color: var(--text-muted);
+}
+
+.icon-button-close:hover:not(:disabled) {
+  background: #edf4f8;
+  border-color: var(--line-strong);
+  color: var(--text-strong);
+}
+
 .field-label {
   font-size: 0.8rem;
   font-weight: 700;

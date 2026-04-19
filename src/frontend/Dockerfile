@@ -11,6 +11,7 @@ FROM nginx:1.27-alpine AS final
 WORKDIR /usr/share/nginx/html
 
 COPY src/frontend/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY src/frontend/nginx/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
 COPY --from=build /app/dist/blinkshare-frontend/browser ./
 
 EXPOSE 80
