@@ -1,5 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, ViewChild, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  ViewChild,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
@@ -31,6 +40,30 @@ type PreviewState =
       downloadUrl: string | null;
     };
 
+const WORKSPACE_ONBOARDING_DISMISSED_KEY = 'blinkshare.workspace-onboarding-dismissed';
+type OnboardingStep =
+  | 'create-session'
+  | 'join-session'
+  | 'send-text'
+  | 'upload-file'
+  | 'recent-items'
+  | 'quota';
+
+const ONBOARDING_STEPS: OnboardingStep[] = [
+  'create-session',
+  'join-session',
+  'send-text',
+  'upload-file',
+  'recent-items',
+  'quota',
+];
+
+interface OnboardingBubble {
+  title: string;
+  body: string;
+  actionLabel: string;
+}
+
 @Component({
   selector: 'app-workspace-page',
   standalone: true,
@@ -46,12 +79,17 @@ type PreviewState =
   template: `
     <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1.4fr)_27rem]">
       <section class="space-y-3.5">
-        <article class="surface-card p-3 sm:p-3.5">
+        <article
+          class="surface-card p-3 transition-[border-color,box-shadow,background-color] duration-150 sm:p-3.5"
+          [style.border-color]="workspaceCardBorderColor()"
+          [style.background]="workspaceCardBackground()"
+          [style.box-shadow]="workspaceCardShadow()"
+        >
           <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-stretch">
             <div class="flex h-full flex-col justify-between gap-2.5">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your code</p>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Session code</p>
                   <div class="mt-1 flex min-h-[2.1rem] items-center sm:h-[2.3rem]">
                     @if (store.session(); as session) {
                       <h2 class="font-code text-[1.65rem] leading-none font-bold tracking-[0.08em] sm:text-[1.8rem]" style="color: var(--text-strong);">{{ session.code }}</h2>
@@ -72,7 +110,16 @@ type PreviewState =
               </div>
 
               <div class="flex min-h-[2.15rem] flex-wrap items-center gap-1.5 overflow-hidden">
-                <button class="icon-button icon-button-active" type="button" (click)="store.createSession()" [disabled]="store.busyAction() !== null" aria-label="New code" title="New code">
+                <button
+                  #createSessionButton
+                  class="icon-button icon-button-active"
+                  type="button"
+                  (click)="store.createSession()"
+                  [disabled]="store.busyAction() !== null"
+                  aria-label="New session"
+                  title="New session"
+                  [style.box-shadow]="isOnboardingStep('create-session') ? '0 0 0 3px rgb(200 220 234 / 0.75)' : 'none'"
+                >
                   <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                     <path d="M12 5v14" />
                     <path d="M5 12h14" />
@@ -101,16 +148,24 @@ type PreviewState =
               </div>
             </div>
 
-            <div class="surface-panel flex h-full min-w-0 flex-col justify-start p-2.5">
-              <label class="field-label">Connect to code</label>
+            <div
+              #joinSection
+              class="surface-panel flex h-full min-w-0 flex-col justify-start p-2.5 transition-[border-color,box-shadow,background-color] duration-150"
+              [class.app-disabled-panel]="hasActiveSession()"
+              [style.border-color]="isOnboardingStep('join-session') ? 'var(--surface-strong)' : 'var(--line-default)'"
+              [style.background]="isOnboardingStep('join-session') ? 'var(--accent-soft)' : 'var(--surface-muted)'"
+              [style.box-shadow]="isOnboardingStep('join-session') ? '0 0 0 3px rgb(200 220 234 / 0.55)' : 'none'"
+            >
+              <label class="field-label">Connect to session</label>
               <div class="mt-2 flex items-center gap-1.5">
                 <input
                   class="field-input h-[2.15rem] min-w-0 px-2.5 py-0 text-sm leading-[2.15rem] font-code uppercase tracking-[0.16em]"
                   [value]="joinCode()"
+                  [disabled]="hasActiveSession()"
                   (input)="joinCode.set(($any($event.target).value || '').toUpperCase())"
                   placeholder="ABCD1234"
                 />
-                <button class="icon-button shrink-0" type="button" (click)="store.joinSession(joinCode())" [disabled]="store.busyAction() !== null" aria-label="Connect" title="Connect">
+                <button class="icon-button shrink-0" type="button" (click)="store.joinSession(joinCode())" [disabled]="store.busyAction() !== null || hasActiveSession()" aria-label="Connect" title="Connect">
                   <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                     <path d="m5 12 14 0" />
                     <path d="m13 6 6 6-6 6" />
@@ -121,13 +176,20 @@ type PreviewState =
           </div>
         </article>
 
-        <article class="surface-card p-3 sm:p-3.5">
+        <article
+          #editorSection
+          class="surface-card p-3 transition-opacity duration-150 sm:p-3.5"
+          [class.app-disabled-section]="!hasActiveSession()"
+          [style.border-color]="isOnboardingStep('send-text') ? 'var(--surface-strong)' : 'var(--line-default)'"
+          [style.box-shadow]="isOnboardingStep('send-text') ? '0 0 0 3px rgb(200 220 234 / 0.55)' : 'none'"
+        >
           <div class="mb-2.5 flex items-center justify-between gap-2 overflow-x-auto pb-1">
             <div class="workspace-compact-select-shell">
               <select
                 class="workspace-compact-select"
                 [value]="store.draft().language"
                 (change)="store.setDraftLanguage($any($event.target).value)"
+                [disabled]="!hasActiveSession()"
               >
                 @for (language of languages; track language.id) {
                   <option [value]="language.id">{{ language.label }}</option>
@@ -135,7 +197,7 @@ type PreviewState =
               </select>
             </div>
             @if (hasDraftText()) {
-              <button class="icon-button icon-button-active shrink-0" type="button" (click)="sendDraft()" [disabled]="store.busyAction() !== null" aria-label="Send to session" title="Send to session">
+              <button class="icon-button icon-button-active shrink-0" type="button" (click)="sendDraft()" [disabled]="store.busyAction() !== null || !hasActiveSession()" aria-label="Send to session" title="Send to session">
                 <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                   <path d="M22 2 11 13" />
                   <path d="M22 2 15 22l-4-9-9-4Z" />
@@ -144,17 +206,24 @@ type PreviewState =
             }
           </div>
 
-          <div>
+          <div [class.pointer-events-none]="!hasActiveSession()">
             <app-code-editor
               [value]="store.draft().text"
               [language]="store.draft().language"
               [wrap]="store.draft().wrap"
+              [readOnly]="!hasActiveSession()"
               (contentChanged)="store.setDraftText($event)"
             />
           </div>
         </article>
 
-        <article class="surface-card p-3 sm:p-3.5">
+        <article
+          #fileSection
+          class="surface-card p-3 transition-opacity duration-150 sm:p-3.5"
+          [class.app-disabled-section]="!hasActiveSession()"
+          [style.border-color]="isOnboardingStep('upload-file') ? 'var(--surface-strong)' : 'var(--line-default)'"
+          [style.box-shadow]="isOnboardingStep('upload-file') ? '0 0 0 3px rgb(200 220 234 / 0.55)' : 'none'"
+        >
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p class="text-[1.2rem] font-semibold" style="color: var(--text-strong);">Files</p>
@@ -166,7 +235,7 @@ type PreviewState =
             </div>
 
             <div class="flex items-center gap-2">
-              <button class="icon-button" type="button" (click)="fileInput.click()" aria-label="Choose file" title="Choose file">
+              <button class="icon-button" type="button" (click)="hasActiveSession() && fileInput.click()" [disabled]="!hasActiveSession()" aria-label="Choose file" title="Choose file">
                 <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <path d="M17 8 12 3 7 8" />
@@ -174,7 +243,7 @@ type PreviewState =
                 </svg>
               </button>
               @if (selectedFileName()) {
-                <button class="icon-button icon-button-active" type="button" (click)="uploadSelectedFile()" [disabled]="store.busyAction() !== null" aria-label="Upload file" title="Upload file">
+                <button class="icon-button icon-button-active" type="button" (click)="uploadSelectedFile()" [disabled]="store.busyAction() !== null || !hasActiveSession()" aria-label="Upload file" title="Upload file">
                   <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                     <path d="M22 2 11 13" />
                     <path d="M22 2 15 22l-4-9-9-4Z" />
@@ -230,7 +299,12 @@ type PreviewState =
           </article>
         }
 
-        <article class="surface-card flex max-h-[34rem] min-h-[12rem] flex-col overflow-hidden p-0">
+        <article
+          #recentSection
+          class="surface-card flex max-h-[34rem] min-h-[12rem] flex-col overflow-hidden p-0"
+          [style.border-color]="isOnboardingStep('recent-items') ? 'var(--surface-strong)' : 'var(--line-default)'"
+          [style.box-shadow]="isOnboardingStep('recent-items') ? '0 0 0 3px rgb(200 220 234 / 0.55)' : 'none'"
+        >
           <div class="sticky top-0 z-10 flex items-center justify-between gap-2 border-b px-3.5 py-3" style="border-color: var(--line-default); background: var(--surface-default);">
             <p class="text-[1.12rem] font-semibold" style="color: var(--text-strong);">Recent</p>
             <button class="icon-button icon-button-danger h-9 w-9" type="button" (click)="store.clearHistory()" aria-label="Clear history" title="Clear history">
@@ -255,7 +329,13 @@ type PreviewState =
           </div>
         </article>
 
-        <article class="surface-card p-3.5 text-sm" style="color: var(--text-muted);">
+        <article
+          #quotaSection
+          class="surface-card p-3.5 text-sm"
+          style="color: var(--text-muted);"
+          [style.border-color]="isOnboardingStep('quota') ? 'var(--surface-strong)' : 'var(--line-default)'"
+          [style.box-shadow]="isOnboardingStep('quota') ? '0 0 0 3px rgb(200 220 234 / 0.55)' : 'none'"
+        >
           <p class="text-[1.02rem] font-semibold" style="color: var(--text-strong);">Quota</p>
           @if (store.quota(); as quota) {
             <p class="mt-1 text-lg font-semibold tracking-tight" style="color: var(--text-strong);">
@@ -284,6 +364,33 @@ type PreviewState =
         </article>
       </aside>
     </div>
+
+    @if (activeOnboardingStep(); as onboardingStep) {
+      <div class="pointer-events-none fixed inset-0 z-30">
+        <article
+          class="onboarding-callout pointer-events-auto"
+          [style.left.px]="onboardingBubbleLeft()"
+          [style.top.px]="onboardingBubbleTop()"
+          [style.width.px]="onboardingBubbleWidth()"
+        >
+          <div
+            class="onboarding-callout-arrow"
+            [class.onboarding-callout-arrow-top]="onboardingBubblePlacement() === 'top'"
+            [style.left.px]="onboardingBubbleArrowLeft()"
+          ></div>
+          <p class="text-sm font-semibold" style="color: white;">{{ onboardingBubbleCopy(onboardingStep).title }}</p>
+          <p class="mt-1 text-sm leading-5 text-white/90">{{ onboardingBubbleCopy(onboardingStep).body }}</p>
+          <div class="mt-3 flex items-center justify-between gap-3">
+            <button class="text-sm font-semibold text-white/85 underline decoration-white/35 underline-offset-3 hover:text-white" type="button" (click)="dismissOnboarding()">
+              Dismiss
+            </button>
+            <button class="app-button h-[2rem] border-white/25 bg-white/18 px-3 py-0 text-sm text-white backdrop-blur-sm hover:bg-white/24" type="button" (click)="nextOnboardingStep()">
+              {{ onboardingBubbleCopy(onboardingStep).actionLabel }}
+            </button>
+          </div>
+        </article>
+      </div>
+    }
 
     @if (previewState(); as preview) {
       <div class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 px-4 py-6" (click)="closePreview()">
@@ -374,6 +481,7 @@ type PreviewState =
 })
 export class WorkspacePageComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly store = inject(WorkspaceStore);
   private readonly sharesApi = inject(SharesApi);
   protected readonly joinCode = signal('');
@@ -382,11 +490,25 @@ export class WorkspacePageComponent {
   protected readonly selectedFile = signal<File | null>(null);
   protected readonly fileUploadProgress = signal<number | null>(null);
   protected readonly previewState = signal<PreviewState | null>(null);
+  protected readonly onboardingDismissed = signal(this.readOnboardingDismissed());
+  protected readonly onboardingStepIndex = signal(0);
+  protected readonly onboardingBubbleLeft = signal(16);
+  protected readonly onboardingBubbleTop = signal(16);
+  protected readonly onboardingBubbleWidth = signal(320);
+  protected readonly onboardingBubbleArrowLeft = signal(28);
+  protected readonly onboardingBubblePlacement = signal<'top' | 'bottom'>('bottom');
   protected readonly languages = EDITOR_LANGUAGES;
 
   private copiedHandle: ReturnType<typeof setTimeout> | null = null;
   private snackbarHandle: ReturnType<typeof setTimeout> | null = null;
+  private viewReady = false;
   @ViewChild('fileInput') private readonly fileInput?: { nativeElement: HTMLInputElement };
+  @ViewChild('createSessionButton') private readonly createSessionButton?: ElementRef<HTMLElement>;
+  @ViewChild('joinSection') private readonly joinSection?: ElementRef<HTMLElement>;
+  @ViewChild('editorSection') private readonly editorSection?: ElementRef<HTMLElement>;
+  @ViewChild('fileSection') private readonly fileSection?: ElementRef<HTMLElement>;
+  @ViewChild('recentSection') private readonly recentSection?: ElementRef<HTMLElement>;
+  @ViewChild('quotaSection') private readonly quotaSection?: ElementRef<HTMLElement>;
   @ViewChild(CodeEditorComponent) private readonly codeEditor?: CodeEditorComponent;
 
   public constructor() {
@@ -405,6 +527,26 @@ export class WorkspacePageComponent {
 
       this.showSnackbar(error.message);
     });
+
+    effect(() => {
+      this.onboardingDismissed();
+      this.onboardingStepIndex();
+      queueMicrotask(() => this.refreshOnboardingBubble());
+    });
+  }
+
+  public ngAfterViewInit(): void {
+    this.viewReady = true;
+
+    const reposition = () => this.refreshOnboardingBubble();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    this.destroyRef.onDestroy(() => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    });
+
+    queueMicrotask(() => this.refreshOnboardingBubble());
   }
 
   protected sessionTone(): 'neutral' | 'success' | 'warning' | 'danger' {
@@ -418,6 +560,39 @@ export class WorkspacePageComponent {
       default:
         return 'neutral';
     }
+  }
+
+  protected hasActiveSession(): boolean {
+    return this.store.session() !== null;
+  }
+
+  protected isOnboardingStep(step: OnboardingStep): boolean {
+    return !this.onboardingDismissed() && ONBOARDING_STEPS[this.onboardingStepIndex()] === step;
+  }
+
+  protected activeOnboardingStep(): OnboardingStep | null {
+    return this.onboardingDismissed() ? null : ONBOARDING_STEPS[this.onboardingStepIndex()] ?? null;
+  }
+
+  protected dismissOnboarding(): void {
+    this.onboardingDismissed.set(true);
+
+    try {
+      localStorage.setItem(WORKSPACE_ONBOARDING_DISMISSED_KEY, 'true');
+    } catch {
+      // Best-effort only; onboarding can reappear if storage is unavailable.
+    }
+  }
+
+  protected nextOnboardingStep(): void {
+    const nextIndex = this.onboardingStepIndex() + 1;
+    if (nextIndex >= ONBOARDING_STEPS.length) {
+      this.dismissOnboarding();
+      return;
+    }
+
+    this.onboardingStepIndex.set(nextIndex);
+    queueMicrotask(() => this.scrollOnboardingTargetIntoView());
   }
 
   protected onFileChosen(event: Event): void {
@@ -655,6 +830,156 @@ export class WorkspacePageComponent {
         return 'Premium';
       default:
         return String(tier);
+    }
+  }
+
+  private readOnboardingDismissed(): boolean {
+    try {
+      return localStorage.getItem(WORKSPACE_ONBOARDING_DISMISSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  protected onboardingBubbleCopy(step: OnboardingStep): OnboardingBubble {
+    switch (step) {
+      case 'create-session':
+        return {
+          title: 'Create a new session',
+          body: 'Start by tapping the + button to generate your own session code. Share that code so another device can join you.',
+          actionLabel: 'Next',
+        };
+      case 'join-session':
+        return {
+          title: 'Join with a code',
+          body: 'Paste a friend’s code here, then tap the arrow button to join their live session instantly.',
+          actionLabel: 'Next',
+        };
+      case 'send-text':
+        return {
+          title: 'Send text',
+          body: 'Write or paste text in the editor, choose a language if you want syntax highlighting, then send it to the active session.',
+          actionLabel: 'Next',
+        };
+      case 'upload-file':
+        return {
+          title: 'Upload files',
+          body: 'Choose a file here to create a share and relay its metadata to the connected peer.',
+          actionLabel: 'Next',
+        };
+      case 'recent-items':
+        return {
+          title: 'Review recent items',
+          body: 'This panel keeps your recent sent and received text snippets and files, with preview, copy, and download actions.',
+          actionLabel: 'Next',
+        };
+      case 'quota':
+        return {
+          title: 'Watch your quota',
+          body: 'Your tier, usage, and reset window live here so you can see how much room you have left for sharing.',
+          actionLabel: 'Finish',
+        };
+    }
+  }
+
+  protected workspaceCardBorderColor(): string {
+    if (this.isOnboardingStep('create-session') || this.isOnboardingStep('join-session')) {
+      return 'var(--surface-strong)';
+    }
+
+    return this.hasActiveSession() ? 'var(--line-default)' : 'var(--surface-strong)';
+  }
+
+  protected workspaceCardBackground(): string {
+    if (this.isOnboardingStep('create-session') || this.isOnboardingStep('join-session')) {
+      return '#f7fcfd';
+    }
+
+    return this.hasActiveSession() ? 'var(--surface-default)' : '#f7fcfd';
+  }
+
+  protected workspaceCardShadow(): string {
+    if (this.isOnboardingStep('create-session') || this.isOnboardingStep('join-session')) {
+      return '0 0 0 3px rgb(200 220 234 / 0.55)';
+    }
+
+    return this.hasActiveSession() ? 'none' : '0 0 0 3px rgb(200 220 234 / 0.55)';
+  }
+
+  private refreshOnboardingBubble(): void {
+    if (!this.viewReady || this.onboardingDismissed()) {
+      return;
+    }
+
+    const target = this.getOnboardingTargetElement();
+    if (!target) {
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const bubbleWidth = Math.min(360, Math.max(260, viewportWidth - 32));
+    const bubbleHeight = viewportWidth < 640 ? 164 : 148;
+    const horizontalPadding = 16;
+    const verticalGap = 16;
+
+    const left = Math.min(
+      Math.max(horizontalPadding, rect.left + rect.width / 2 - bubbleWidth / 2),
+      viewportWidth - bubbleWidth - horizontalPadding,
+    );
+
+    let placement: 'top' | 'bottom' = 'bottom';
+    let top = rect.bottom + verticalGap;
+
+    if (top + bubbleHeight > viewportHeight - horizontalPadding) {
+      placement = 'top';
+      top = Math.max(horizontalPadding, rect.top - bubbleHeight - verticalGap);
+    }
+
+    const arrowLeft = Math.min(
+      Math.max(24, rect.left + rect.width / 2 - left - 10),
+      bubbleWidth - 24,
+    );
+
+    this.onboardingBubbleWidth.set(bubbleWidth);
+    this.onboardingBubbleLeft.set(left);
+    this.onboardingBubbleTop.set(top);
+    this.onboardingBubbleArrowLeft.set(arrowLeft);
+    this.onboardingBubblePlacement.set(placement);
+  }
+
+  private scrollOnboardingTargetIntoView(): void {
+    const target = this.getOnboardingTargetElement();
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest',
+    });
+
+    window.setTimeout(() => this.refreshOnboardingBubble(), 220);
+  }
+
+  private getOnboardingTargetElement(): HTMLElement | null {
+    switch (this.activeOnboardingStep()) {
+      case 'create-session':
+        return this.createSessionButton?.nativeElement ?? null;
+      case 'join-session':
+        return this.joinSection?.nativeElement ?? null;
+      case 'send-text':
+        return this.editorSection?.nativeElement ?? null;
+      case 'upload-file':
+        return this.fileSection?.nativeElement ?? null;
+      case 'recent-items':
+        return this.recentSection?.nativeElement ?? null;
+      case 'quota':
+        return this.quotaSection?.nativeElement ?? null;
+      default:
+        return null;
     }
   }
 }
