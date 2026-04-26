@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blinkshare-config
+  namespace: blinkshare
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  DOTNET_ENVIRONMENT: Production
+  ASPNETCORE_URLS: http://+:8080
+  API_BASE_URL: ""
+  APP_NAME: BlinkShare
+  ANONYMOUS_MAX_FILE_SIZE_BYTES: "524288"
+  FREE_ACCOUNT_MAX_FILE_SIZE_BYTES: "1048576"
+  ConnectionStrings__Redis: redis:6379,abortConnect=false
+  Shares__CreateFileUpload__AnonymousMaxFileSizeBytes: "524288"
+  Shares__CreateFileUpload__FreeMaxFileSizeBytes: "1048576"
+  ObjectStorage__ServiceUrl: http://object-storage:9000
+  ObjectStorage__PublicUrl: https://files.example.com
+  ObjectStorage__BucketName: blinkshare
+  ObjectStorage__Region: garage
+  ObjectStorage__ForcePathStyle: "true"

@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: garage-config
+  namespace: blinkshare
+data:
+  garage.toml: |-
+    metadata_dir = "/var/lib/garage/meta"
+    data_dir = "/var/lib/garage/data"
+    db_engine = "sqlite"
+
+    replication_factor = 1
+
+    rpc_bind_addr = "[::]:3901"
+    rpc_public_addr = "object-storage:3901"
+    rpc_secret = "CHANGE_ME_64_HEX_GARAGE_RPC_SECRET"
+
+    [s3_api]
+    s3_region = "garage"
+    api_bind_addr = "[::]:3900"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: object-storage
+  namespace: blinkshare
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: object-storage
+  template:
+    metadata:
+      labels:
+        app: object-storage
+    spec:
+      containers:
+        - name: object-storage
+          image: dxflrs/garage:v2.2.0
+          env:
+            - name: GARAGE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: garage-rpc-secret
+          ports:
+            - containerPort: 3900
+              name: s3
+            - containerPort: 3901
+              name: rpc
+          startupProbe:
+            tcpSocket:
+              port: rpc
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: s3
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: rpc
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          volumeMounts:
+            - name: garage-config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+              readOnly: true
+            - name: object-storage-data
+              mountPath: /var/lib/garage/data
+              subPath: data
+            - name: object-storage-data
+              mountPath: /var/lib/garage/meta
+              subPath: meta
+      volumes:
+        - name: garage-config
+          configMap:
+            name: garage-config
+        - name: object-storage-data
+          persistentVolumeClaim:
+            claimName: object-storage-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: object-storage
+  namespace: blinkshare
+spec:
+  selector:
+    app: object-storage
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: s3
+    - name: rpc
+      port: 3901
+      targetPort: rpc

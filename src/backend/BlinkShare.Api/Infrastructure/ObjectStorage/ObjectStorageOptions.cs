@@ -18,10 +18,10 @@ public sealed class ObjectStorageOptions
     public string BucketName { get; set; } = "blinkshare";
 
     [Required]
-    public string AccessKey { get; set; } = "GK0123456789abcdef01234567";
+    public string AccessKey { get; set; } = "CHANGE_ME_GARAGE_ACCESS_KEY";
 
     [Required]
-    public string SecretKey { get; set; } = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    public string SecretKey { get; set; } = "CHANGE_ME_GARAGE_SECRET_KEY";
 
     [Required]
     public string Region { get; set; } = "garage";

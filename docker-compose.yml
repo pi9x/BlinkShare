@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: blinkshare
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: blinkshare_dev_password
     ports:
       - "5432:5432"
     healthcheck:
@@ -33,7 +33,7 @@ services:
   object-storage:
     image: dxflrs/garage:v2.2.0
     environment:
-      GARAGE_RPC_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      GARAGE_RPC_SECRET: CHANGE_ME_64_HEX_GARAGE_RPC_SECRET
     ports:
       - "9000:3900"
     healthcheck:
@@ -54,9 +54,9 @@ services:
         condition: service_healthy
     environment:
       GARAGE_CONFIG_FILE: /etc/garage.toml
-      GARAGE_RPC_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      GARAGE_ACCESS_KEY_ID: GK0123456789abcdef01234567
-      GARAGE_SECRET_ACCESS_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      GARAGE_RPC_SECRET: CHANGE_ME_64_HEX_GARAGE_RPC_SECRET
+      GARAGE_ACCESS_KEY_ID: CHANGE_ME_GARAGE_ACCESS_KEY
+      GARAGE_SECRET_ACCESS_KEY: CHANGE_ME_GARAGE_SECRET_KEY
       GARAGE_BUCKET_NAME: blinkshare
       GARAGE_NODE_CAPACITY: 10G
     volumes:
@@ -79,13 +79,13 @@ services:
       object-storage-init:
         condition: service_completed_successfully
     environment:
-      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=blinkshare;Username=postgres;Password=postgres
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=blinkshare;Username=postgres;Password=blinkshare_dev_password
       ConnectionStrings__Redis: redis:6379,abortConnect=false
       ObjectStorage__ServiceUrl: http://object-storage:9000
       ObjectStorage__PublicUrl: http://localhost:9000
       ObjectStorage__BucketName: blinkshare
-      ObjectStorage__AccessKey: GK0123456789abcdef01234567
-      ObjectStorage__SecretKey: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ObjectStorage__AccessKey: CHANGE_ME_GARAGE_ACCESS_KEY
+      ObjectStorage__SecretKey: CHANGE_ME_GARAGE_SECRET_KEY
       ObjectStorage__Region: garage
       ObjectStorage__ForcePathStyle: "true"
     command:
@@ -118,13 +118,13 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=blinkshare;Username=postgres;Password=postgres
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=blinkshare;Username=postgres;Password=blinkshare_dev_password
       ConnectionStrings__Redis: redis:6379,abortConnect=false
       ObjectStorage__ServiceUrl: http://object-storage:9000
       ObjectStorage__PublicUrl: http://localhost:9000
       ObjectStorage__BucketName: blinkshare
-      ObjectStorage__AccessKey: GK0123456789abcdef01234567
-      ObjectStorage__SecretKey: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ObjectStorage__AccessKey: CHANGE_ME_GARAGE_ACCESS_KEY
+      ObjectStorage__SecretKey: CHANGE_ME_GARAGE_SECRET_KEY
       ObjectStorage__Region: garage
       ObjectStorage__ForcePathStyle: "true"
     ports:
@@ -145,12 +145,12 @@ services:
         condition: service_completed_successfully
     environment:
       DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=blinkshare;Username=postgres;Password=postgres
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=blinkshare;Username=postgres;Password=blinkshare_dev_password
       ObjectStorage__ServiceUrl: http://object-storage:9000
       ObjectStorage__PublicUrl: http://localhost:9000
       ObjectStorage__BucketName: blinkshare
-      ObjectStorage__AccessKey: GK0123456789abcdef01234567
-      ObjectStorage__SecretKey: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ObjectStorage__AccessKey: CHANGE_ME_GARAGE_ACCESS_KEY
+      ObjectStorage__SecretKey: CHANGE_ME_GARAGE_SECRET_KEY
       ObjectStorage__Region: garage
       ObjectStorage__ForcePathStyle: "true"
 

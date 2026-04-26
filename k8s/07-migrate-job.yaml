@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: blinkshare
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: migrate
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:17-alpine
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: postgres-db
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: postgres-user
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 2; done
+      containers:
+        - name: migrator
+          image: docker.io/pi9x/blinkshare-migrator:0.1.4
+          args:
+            - database
+            - update
+            - --project
+            - /src/src/backend/BlinkShare.Api/BlinkShare.Api.csproj
+            - --startup-project
+            - /src/src/backend/BlinkShare.Api/BlinkShare.Api.csproj
+            - --configuration
+            - Release
+            - --no-build
+          envFrom:
+            - configMapRef:
+                name: blinkshare-config
+          env:
+            - name: ConnectionStrings__Postgres
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: connection-string-postgres
+            - name: ObjectStorage__AccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: object-storage-access-key
+            - name: ObjectStorage__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: object-storage-secret-key

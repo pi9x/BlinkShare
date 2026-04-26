@@ -9,7 +9,7 @@ public sealed class ShareConfigurationTests
     public void Share_model_uses_expected_table_columns_and_indexes()
     {
         var options = new DbContextOptionsBuilder<BlinkShareDbContext>()
-            .UseNpgsql("Host=localhost;Port=5432;Database=blinkshare_tests;Username=postgres;Password=postgres")
+            .UseNpgsql("Host=localhost;Port=5432;Database=blinkshare_tests;Username=postgres;Password=blinkshare_test_password")
             .Options;
 
         using var dbContext = new BlinkShareDbContext(options);

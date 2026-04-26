@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: object-storage-init
+  namespace: blinkshare
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: object-storage-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap-garage
+          image: docker.io/pi9x/blinkshare-garage-bootstrap:0.1.4
+          env:
+            - name: GARAGE_CONFIG_FILE
+              value: /etc/garage/garage.toml
+            - name: GARAGE_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: object-storage-access-key
+            - name: GARAGE_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: object-storage-secret-key
+            - name: GARAGE_BUCKET_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: blinkshare-config
+                  key: ObjectStorage__BucketName
+            - name: GARAGE_S3_ENDPOINT_URL
+              value: http://object-storage:9000
+            - name: GARAGE_CORS_ALLOWED_ORIGINS
+              value: https://blinkshare.example.com
+            - name: GARAGE_NODE_CAPACITY
+              value: 10G
+            - name: GARAGE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: blinkshare-secrets
+                  key: garage-rpc-secret
+          volumeMounts:
+            - name: garage-config
+              mountPath: /etc/garage/garage.toml
+              subPath: garage.toml
+              readOnly: true
+            - name: object-storage-data
+              mountPath: /var/lib/garage/data
+              subPath: data
+            - name: object-storage-data
+              mountPath: /var/lib/garage/meta
+              subPath: meta
+      volumes:
+        - name: garage-config
+          configMap:
+            name: garage-config
+        - name: object-storage-data
+          persistentVolumeClaim:
+            claimName: object-storage-data

@@ -6,7 +6,7 @@ replication_factor = 1
 
 rpc_bind_addr = "[::]:3901"
 rpc_public_addr = "object-storage:3901"
-rpc_secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+rpc_secret = "CHANGE_ME_64_HEX_GARAGE_RPC_SECRET"
 
 [s3_api]
 s3_region = "garage"
