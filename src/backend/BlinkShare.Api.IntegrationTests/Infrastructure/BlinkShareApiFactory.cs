@@ -5,6 +5,7 @@ using BlinkShare.Api.Infrastructure.Security;
 using DotNet.Testcontainers.Builders;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,7 +40,7 @@ public sealed class BlinkShareApiFactory : WebApplicationFactory<Program>, IAsyn
             });
         });
 
-        builder.ConfigureServices(services =>
+        builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(new FixedClock(FixedUtcNow));
@@ -48,6 +49,24 @@ public sealed class BlinkShareApiFactory : WebApplicationFactory<Program>, IAsyn
             services.AddSingleton<ICodeGenerator>(new FixedCodeGenerator("TEST1234"));
             services.RemoveAll<IObjectStorage>();
             services.AddSingleton<IObjectStorage, FakeObjectStorage>();
+
+            services.RemoveAll<IDbContextFactory<BlinkShareDbContext>>();
+            services.RemoveAll<DbContextOptions<BlinkShareDbContext>>();
+            services.AddPooledDbContextFactory<BlinkShareDbContext>(options =>
+            {
+                if (string.IsNullOrWhiteSpace(_postgresConnectionString))
+                {
+                    throw new InvalidOperationException("The PostgreSQL test container has not started.");
+                }
+
+                options.UseNpgsql(_postgresConnectionString, npgsql =>
+                {
+                    npgsql.EnableRetryOnFailure(3);
+                    npgsql.CommandTimeout(5);
+                });
+
+                options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+            });
         });
     }
 

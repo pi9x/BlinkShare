@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using BlinkShare.Api.Common.Time;
 using BlinkShare.Api.Infrastructure.Auth;
 using BlinkShare.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
@@ -12,7 +13,8 @@ public sealed class BlinkShareBearerAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
     UrlEncoder encoder,
-    IDbContextFactory<BlinkShareDbContext> dbContextFactory)
+    IDbContextFactory<BlinkShareDbContext> dbContextFactory,
+    IClock clock)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -34,7 +36,7 @@ public sealed class BlinkShareBearerAuthenticationHandler(
 
         var account = await dbContext.AuthSessions
             .Where(session => session.TokenHash == tokenHash)
-            .Where(session => session.RevokedAtUtc == null && session.ExpiresAtUtc > DateTimeOffset.UtcNow)
+            .Where(session => session.RevokedAtUtc == null && session.ExpiresAtUtc > clock.UtcNow)
             .Join(
                 dbContext.Accounts,
                 session => session.AccountId,

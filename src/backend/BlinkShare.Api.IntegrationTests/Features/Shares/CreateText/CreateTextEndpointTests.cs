@@ -30,7 +30,7 @@ public sealed class CreateTextEndpointTests(BlinkShareApiFactory factory) : ICla
         Assert.NotNull(payload);
         Assert.Equal("TEST1234", payload!.Code);
         Assert.Equal(factory.FixedUtcNow.AddMinutes(5), payload.ExpiresAtUtc);
-        Assert.Equal(new Uri("http://localhost/api/v1/shares/TEST1234"), response.Headers.Location);
+        Assert.Equal(new Uri("/api/v1/shares/TEST1234", UriKind.Relative), response.Headers.Location);
 
         await using var scope = factory.Services.CreateAsyncScope();
         var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<BlinkShareDbContext>>();
